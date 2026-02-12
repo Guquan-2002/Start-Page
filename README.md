@@ -1,4 +1,4 @@
-﻿# Start Page Pro
+﻿# Start Page
 
 A modular browser start page with dynamic themes, weather status, smart search engine switching, and an integrated AI chat panel.
 
