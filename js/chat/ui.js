@@ -1,30 +1,8 @@
-﻿function estimateTokenCount(text) {
-    const cjkChars = (text.match(/[\u4e00-\u9fff\u3000-\u303f]/g) || []).length;
-    const otherChars = text.length - cjkChars;
-    return Math.ceil(cjkChars / 1.5 + otherChars / 4);
-}
-
-function getConversationTokenCount(messages) {
-    return messages.reduce((sum, message) => sum + estimateTokenCount(message.content) + 4, 0);
-}
-
-function findLastMessageIndex(messages, role, content) {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-        const message = messages[index];
-        if (message.role === role && message.content === content) {
-            return index;
-        }
-    }
-
-    return -1;
-}
-
-export function createUiManager({
+﻿export function createUiManager({
     state,
     elements,
     renderMarkdown,
-    maxRenderedMessages,
-    maxContextTokens
+    maxRenderedMessages
 }) {
     const { messagesEl, chatInput, sendBtn, stopBtn } = elements;
 
@@ -68,7 +46,29 @@ export function createUiManager({
         }
     }
 
-    function addMessage(role, text) {
+function findLastMessageIndex(messages, role, content) {
+        for (let index = messages.length - 1; index >= 0; index -= 1) {
+            const message = messages[index];
+            if (message.role === role && message.content === content) {
+                return index;
+            }
+        }
+
+    return -1;
+}
+
+    function findHistoryIndexByMessageId(messages, role, messageId) {
+        for (let index = 0; index < messages.length; index += 1) {
+            const message = messages[index];
+            if (message.role === role && message?.meta?.messageId === messageId) {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    function addMessage(role, text, meta = null) {
         const message = document.createElement('div');
         message.className = `chat-msg ${role}`;
 
@@ -80,6 +80,7 @@ export function createUiManager({
         }
 
         if (role === 'user') {
+            const messageId = typeof meta?.messageId === 'string' ? meta.messageId : '';
             const retryButton = document.createElement('button');
             retryButton.className = 'msg-retry-btn';
             retryButton.innerHTML = '<i class="fas fa-redo"></i>';
@@ -95,7 +96,15 @@ export function createUiManager({
                     messagesEl.removeChild(messagesEl.lastChild);
                 }
 
-                const historyIndex = findLastMessageIndex(state.conversationHistory, 'user', text);
+                let historyIndex = -1;
+                if (messageId) {
+                    historyIndex = findHistoryIndexByMessageId(state.conversationHistory, 'user', messageId);
+                }
+
+                if (historyIndex === -1) {
+                    historyIndex = findLastMessageIndex(state.conversationHistory, 'user', text);
+                }
+
                 if (historyIndex !== -1) {
                     state.conversationHistory.splice(historyIndex);
                 }
@@ -147,22 +156,6 @@ export function createUiManager({
         return notice;
     }
 
-    function trimConversationHistory() {
-        let trimmed = false;
-
-        while (state.conversationHistory.length > 2 && getConversationTokenCount(state.conversationHistory) > maxContextTokens) {
-            state.conversationHistory.shift();
-            trimmed = true;
-        }
-
-        if (trimmed && !messagesEl.querySelector('.chat-trimmed-notice')) {
-            const notice = document.createElement('div');
-            notice.className = 'chat-trimmed-notice';
-            notice.textContent = 'Older messages were trimmed to fit the model context window.';
-            messagesEl.insertBefore(notice, messagesEl.firstChild);
-        }
-    }
-
     function showRetryNotice(attempt, maxRetries, delayMs) {
         const seconds = (delayMs / 1000).toFixed(1);
         addSystemNotice(`Request failed. Retrying in ${seconds}s (${attempt}/${maxRetries})...`, delayMs + 500);
@@ -178,7 +171,6 @@ export function createUiManager({
         addSystemNotice,
         scrollToBottom,
         setStreamingUI,
-        trimConversationHistory,
         showRetryNotice,
         showBackupKeyNotice
     };

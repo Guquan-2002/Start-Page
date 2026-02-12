@@ -1,13 +1,123 @@
-﻿const DEFAULT_SESSION_TITLE = 'New chat';
+﻿import { SOURCES_MARKDOWN_MARKER } from './constants.js';
+
+const DEFAULT_SESSION_TITLE = 'New chat';
 
 function buildSessionTitle(messages) {
     const firstUserMessage = messages.find((message) => message.role === 'user');
     if (!firstUserMessage) return DEFAULT_SESSION_TITLE;
 
-    const plainText = firstUserMessage.content.trim();
+    const plainText = (firstUserMessage.content || '').trim();
     if (!plainText) return DEFAULT_SESSION_TITLE;
 
     return plainText.length > 30 ? `${plainText.slice(0, 30)}...` : plainText;
+}
+
+function stripSourcesSection(text) {
+    if (typeof text !== 'string') return '';
+
+    const sourcesIndex = text.lastIndexOf(SOURCES_MARKDOWN_MARKER);
+    if (sourcesIndex === -1) {
+        return text;
+    }
+
+    return text.slice(0, sourcesIndex).trimEnd();
+}
+
+function normalizeMessage(rawMessage) {
+    if (!rawMessage || (rawMessage.role !== 'user' && rawMessage.role !== 'assistant')) {
+        return null;
+    }
+
+    const role = rawMessage.role;
+    const rawContent = typeof rawMessage.content === 'string' ? rawMessage.content : '';
+    const rawMeta = rawMessage.meta && typeof rawMessage.meta === 'object' ? rawMessage.meta : {};
+    const rawDisplayContent = typeof rawMeta.displayContent === 'string' ? rawMeta.displayContent : '';
+
+    const normalized = {
+        role,
+        content: role === 'assistant'
+            ? stripSourcesSection(rawContent || rawDisplayContent).trim()
+            : rawContent
+    };
+
+    if (!normalized.content.trim()) {
+        return null;
+    }
+
+    const normalizedMeta = {};
+
+    if (role === 'assistant') {
+        const displayContent = rawDisplayContent || rawContent;
+        if (displayContent && displayContent !== normalized.content) {
+            normalizedMeta.displayContent = displayContent;
+        }
+    }
+
+    if (Number.isFinite(rawMeta.tokenEstimate) && rawMeta.tokenEstimate > 0) {
+        normalizedMeta.tokenEstimate = rawMeta.tokenEstimate;
+    }
+
+    if (Number.isFinite(rawMeta.createdAt) && rawMeta.createdAt > 0) {
+        normalizedMeta.createdAt = rawMeta.createdAt;
+    }
+
+    if (typeof rawMeta.messageId === 'string' && rawMeta.messageId.trim()) {
+        normalizedMeta.messageId = rawMeta.messageId.trim();
+    }
+
+    if (Object.keys(normalizedMeta).length > 0) {
+        normalized.meta = normalizedMeta;
+    }
+
+    return normalized;
+}
+
+function getMessageDisplayContent(message) {
+    if (message.role === 'assistant' && typeof message?.meta?.displayContent === 'string') {
+        return message.meta.displayContent;
+    }
+
+    return message.content;
+}
+
+function normalizeSession(session) {
+    if (!session || typeof session !== 'object') {
+        return {
+            title: DEFAULT_SESSION_TITLE,
+            messages: [],
+            timestamp: Date.now()
+        };
+    }
+
+    const messages = Array.isArray(session.messages)
+        ? session.messages.map(normalizeMessage).filter(Boolean)
+        : [];
+
+    return {
+        title: typeof session.title === 'string' && session.title.trim()
+            ? session.title.trim()
+            : DEFAULT_SESSION_TITLE,
+        messages,
+        timestamp: Number.isFinite(session.timestamp) && session.timestamp > 0
+            ? session.timestamp
+            : Date.now()
+    };
+}
+
+function cloneMessage(message) {
+    if (!message.meta) {
+        return { role: message.role, content: message.content };
+    }
+
+    return {
+        role: message.role,
+        content: message.content,
+        meta: { ...message.meta }
+    };
+}
+
+function cloneMessages(messages) {
+    return messages.map(cloneMessage);
 }
 
 export function createHistoryManager({
@@ -21,9 +131,20 @@ export function createHistoryManager({
     function loadChatHistory() {
         try {
             const rawHistory = localStorage.getItem(historyKey);
-            if (rawHistory) {
-                state.chatSessions = JSON.parse(rawHistory);
+            if (!rawHistory) {
+                state.chatSessions = {};
+                return;
             }
+
+            const parsed = JSON.parse(rawHistory);
+            if (!parsed || typeof parsed !== 'object') {
+                state.chatSessions = {};
+                return;
+            }
+
+            state.chatSessions = Object.fromEntries(
+                Object.entries(parsed).map(([sessionId, session]) => [sessionId, normalizeSession(session)])
+            );
         } catch {
             state.chatSessions = {};
         }
@@ -56,9 +177,13 @@ export function createHistoryManager({
     function saveCurrentSession() {
         if (!state.currentSessionId) return;
 
+        const normalizedMessages = state.conversationHistory
+            .map(normalizeMessage)
+            .filter(Boolean);
+
         state.chatSessions[state.currentSessionId] = {
-            title: buildSessionTitle(state.conversationHistory),
-            messages: [...state.conversationHistory],
+            title: buildSessionTitle(normalizedMessages),
+            messages: cloneMessages(normalizedMessages),
             timestamp: Date.now()
         };
 
@@ -69,12 +194,15 @@ export function createHistoryManager({
         const session = state.chatSessions[sessionId];
         if (!session) return;
 
+        const normalizedSession = normalizeSession(session);
+        state.chatSessions[sessionId] = normalizedSession;
+
         state.currentSessionId = sessionId;
-        state.conversationHistory = [...session.messages];
+        state.conversationHistory = cloneMessages(normalizedSession.messages);
 
         messagesEl.innerHTML = '';
         state.conversationHistory.forEach((message) => {
-            addMessage(message.role, message.content);
+            addMessage(message.role, getMessageDisplayContent(message), message.meta);
         });
     }
 

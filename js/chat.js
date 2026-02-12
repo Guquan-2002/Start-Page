@@ -74,8 +74,7 @@ export function initChat() {
             stopBtn: elements.stopBtn
         },
         renderMarkdown,
-        maxRenderedMessages: CHAT_LIMITS.maxRenderedMessages,
-        maxContextTokens: CHAT_LIMITS.maxContextTokens
+        maxRenderedMessages: CHAT_LIMITS.maxRenderedMessages
     });
 
     const historyManager = createHistoryManager({
@@ -100,7 +99,9 @@ export function initChat() {
         historyManager,
         constants: {
             connectTimeoutMs: CHAT_LIMITS.connectTimeoutMs,
-            maxRetries: CHAT_LIMITS.maxRetries
+            maxRetries: CHAT_LIMITS.maxRetries,
+            maxContextTokens: CHAT_LIMITS.maxContextTokens,
+            maxContextMessages: CHAT_LIMITS.maxContextMessages
         },
         renderMarkdown,
         escapeHtml
