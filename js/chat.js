@@ -109,7 +109,6 @@ export function initChat() {
             maxContextTokens: CHAT_LIMITS.maxContextTokens,
             maxContextMessages: CHAT_LIMITS.maxContextMessages
         },
-        renderMarkdown,
         escapeHtml
     });
 

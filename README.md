@@ -12,6 +12,8 @@ A modular browser start page with dynamic themes, weather status, smart search e
 - AI chat panel with **Gemini-only** provider support
 - Chat history management (new session, rename, delete, clear all)
 - Config persistence through `localStorage`
+- Context-window controls (token budget + message-count budget)
+- Assistant message segmentation with `<|CHANGE_ROLE|>` marker
 
 ## Project Structure
 
@@ -82,10 +84,21 @@ OpenAI and Anthropic providers are intentionally not supported.
    - **System Prompt** (optional)
    - **Thinking Budget** (optional)
    - **Web Search** (`Disabled` or `Gemini Google Search`)
+   - **Message Prefix**
+     - **Add timestamp prefix**: adds a timestamp as a separate centered system-style message before each user message
+     - **Add user name prefix**: adds user-name tag (for example `【User】`) to user messages only
+     - **User Name**: custom user prefix label
 4. Click **Save Settings**.
 
 Chat settings are stored in `localStorage` under `llm_chat_config`.
 Chat sessions are stored under `llm_chat_history`.
+
+### Chat behavior notes
+
+- Search grounding sources are not appended to chat bubbles and are not stored in chat context.
+- If assistant output includes `<|CHANGE_ROLE|>`, the response is split into multiple assistant messages.
+- Each split assistant segment is rendered as an independent bubble and stored as an independent context/history message.
+- Timestamp prefix messages are stored as independent context entries (not merged into the user text body).
 
 ## Weather API Configuration
 

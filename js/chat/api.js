@@ -1,4 +1,4 @@
-﻿import { SOURCES_MARKDOWN_MARKER } from './constants.js';
+﻿import { ASSISTANT_SEGMENT_MARKER, SOURCES_MARKDOWN_MARKER } from './constants.js';
 
 /**
  * Returns whether an HTTP status code should trigger retry logic.
@@ -176,6 +176,28 @@ function parseGeminiText(responseData) {
         .map((part) => (typeof part?.text === 'string' ? part.text : ''))
         .filter(Boolean)
         .join('');
+}
+
+/**
+ * Splits assistant output by marker into independent message fragments.
+ */
+function splitAssistantMessageByMarker(text) {
+    const rawText = typeof text === 'string' ? text : '';
+    const segments = rawText
+        .split(ASSISTANT_SEGMENT_MARKER)
+        .map((segment) => segment.trim())
+        .filter(Boolean);
+
+    if (segments.length > 0) {
+        return segments;
+    }
+
+    const fallback = rawText.trim();
+    if (fallback) {
+        return [fallback];
+    }
+
+    return ['(No response text)'];
 }
 
 /**
@@ -447,7 +469,6 @@ export function createApiManager({
     configManager,
     historyManager,
     constants,
-    renderMarkdown,
     escapeHtml
 }) {
     const { chatInput, settingsDiv } = elements;
@@ -616,25 +637,26 @@ export function createApiManager({
             const requestBody = buildGeminiRequestBody(contextWindow.messages, config);
             const responseData = await requestGeminiWithFallbackKeys(config, requestBody);
 
-            const assistantRawText = parseGeminiText(responseData).trim() || '(No response text)';
+            const assistantRawText = parseGeminiText(responseData);
+            const assistantSegments = splitAssistantMessageByMarker(assistantRawText);
             const assistantCreatedAt = Date.now();
-            const assistantContextText = assistantRawText;
-            const assistantDisplayText = assistantContextText;
 
-            assistantMessage.classList.remove('typing');
-            assistantMessage.innerHTML = renderMarkdown(assistantDisplayText);
-            ui.addCopyButtons(assistantMessage);
-            ui.scrollToBottom();
+            assistantMessage.remove();
 
-            state.conversationHistory.push({
-                role: 'assistant',
-                content: assistantRawText,
-                meta: buildMessageMeta(assistantRawText, {
-                    displayContent: assistantDisplayText,
-                    contextContent: assistantContextText,
-                    createdAt: assistantCreatedAt
-                })
+            assistantSegments.forEach((segment, index) => {
+                const segmentCreatedAt = assistantCreatedAt + index;
+
+                state.conversationHistory.push({
+                    role: 'assistant',
+                    content: segment,
+                    meta: buildMessageMeta(segment, {
+                        createdAt: segmentCreatedAt
+                    })
+                });
+
+                ui.addMessage('assistant', segment);
             });
+
             historyManager.saveCurrentSession();
         } catch (error) {
             if (error.name === 'AbortError') {
