@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Start Page Pro</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/animations.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/atom-one-dark.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+    <div id="background-effects" aria-hidden="true">
+        <canvas id="starfield-canvas"></canvas>
+        <div class="stars-bg"></div>
+    </div>
+
+    <main class="container">
+        <div id="time-container" role="timer" aria-label="Current time">
+            <div id="time">12:00:00</div>
+            <div id="date">January 12, 2012 Thursday</div>
+        </div>
+
+        <div id="weather-container" aria-label="Weather information">
+            <i id="weather-icon" class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+            <span id="weather-details">Loading weather...</span>
+        </div>
+
+        <div id="search-container" role="search">
+            <form id="search-form" action="#" method="get" target="_blank">
+                <i class="search-icon fas fa-search" aria-hidden="true"></i>
+                <label for="search-input" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Search</label>
+                <input type="text" id="search-input" name="q" placeholder="Search the web..." autocomplete="off" autofocus>
+            </form>
+        </div>
+    </main>
+
+    <div id="network-status" aria-live="polite" aria-label="Network status">
+        <span id="network-indicator"></span>
+        <span id="network-text">Checking network...</span>
+    </div>
+
+    <button id="chat-toggle" aria-label="Open chat" title="AI Chat">
+        <i class="fas fa-comments"></i>
+    </button>
+
+    <div id="chat-panel" class="chat-hidden" aria-label="AI Chat">
+        <div id="chat-header">
+            <span id="chat-title">AI Chat</span>
+            <div id="chat-header-actions">
+                <button id="chat-history-btn" title="Chat history"><i class="fas fa-history"></i></button>
+                <button id="chat-settings-btn" title="Settings"><i class="fas fa-cog"></i></button>
+                <button id="chat-clear-btn" title="Start new chat"><i class="fas fa-trash-alt"></i></button>
+                <button id="chat-close-btn" title="Close"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+
+        <div id="chat-history" class="chat-history-hidden">
+            <div id="chat-history-header">
+                <span>Chat History</span>
+                <div id="chat-history-actions">
+                    <button id="chat-new-session-btn" title="New chat"><i class="fas fa-plus"></i></button>
+                    <button id="chat-clear-all-btn" title="Delete all chats"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+            <div id="chat-history-list"></div>
+        </div>
+
+        <div id="chat-settings" class="chat-settings-hidden">
+            <div class="chat-settings-overlay">
+                <div class="chat-settings-header">
+                    <div class="chat-settings-title-group">
+                        <span class="chat-settings-title">Gemini Settings</span>
+                        <small class="chat-settings-subtitle">Configure Gemini API URL, keys, model, prompt, and optional features.</small>
+                    </div>
+                    <button id="cfg-close-btn" title="Close settings"><i class="fas fa-times"></i></button>
+                </div>
+
+                <div class="chat-settings-content">
+                    <label>Gemini API URL
+                        <input type="text" id="cfg-api-url" placeholder="https://generativelanguage.googleapis.com/v1beta" spellcheck="false">
+                    </label>
+
+                    <div class="chat-settings-row">
+                        <label>Primary API Key
+                            <input type="password" id="cfg-api-key" placeholder="AIza..." spellcheck="false">
+                        </label>
+                        <label>Backup API Key
+                            <input type="password" id="cfg-api-key-backup" placeholder="AIza..." spellcheck="false">
+                        </label>
+                    </div>
+
+                    <label>Gemini Model
+                        <input type="text" id="cfg-model" placeholder="gemini-2.5-pro" spellcheck="false">
+                    </label>
+
+                    <label>System Prompt
+                        <textarea id="cfg-system-prompt" rows="3" placeholder="You are a helpful assistant."></textarea>
+                    </label>
+
+                    <label>Thinking Budget (Optional)
+                        <input type="number" id="cfg-thinking-budget" placeholder="e.g. 2048" min="1" max="100000" step="256" spellcheck="false">
+                        <small class="chat-settings-note">When set, this value is sent as Gemini thinking budget tokens.</small>
+                    </label>
+
+                    <label>Web Search
+                        <select id="cfg-search-mode">
+                            <option value="">Disabled</option>
+                            <option value="gemini_google_search">Gemini Google Search</option>
+                        </select>
+                        <small class="chat-settings-note">Enable grounding with Gemini Google Search.</small>
+                    </label>
+                </div>
+
+                <div class="chat-settings-footer">
+                    <button id="cfg-save-btn">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="chat-messages"></div>
+
+        <div id="chat-input-area">
+            <textarea id="chat-input" placeholder="Type your message..." rows="1"></textarea>
+            <button id="chat-stop-btn" title="Stop generation" style="display:none;"><i class="fas fa-stop"></i></button>
+            <button id="chat-send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

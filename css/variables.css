@@ -1,0 +1,40 @@
+/* --- CSS 变量与主题定义 --- */
+:root {
+    --morning-gradient: linear-gradient(-45deg, hsl(40, 100%, 70%), hsl(20, 70%, 70%), hsl(60, 70%, 70%), hsl(40, 50%, 90%));
+    --day-gradient: linear-gradient(-135deg, hsl(200, 100%, 70%), hsl(220, 70%, 70%), hsl(200, 70%, 70%), hsl(200, 70%, 70%));
+    --evening-gradient: linear-gradient(-45deg, hsl(300, 50%, 50%), hsl(330, 50%, 50%), hsl(270, 50%, 50%), hsl(300, 70%, 70%));
+    --night-gradient: linear-gradient(-135deg, hsl(200, 0%, 30%), hsl(180, 30%, 30%), hsl(220, 20%, 30%), hsl(200, 30%, 30%));
+
+    --current-theme-gradient: var(--night-gradient);
+    --glow-intensity: 0.1;
+
+    --text-color: white;
+    --text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --placeholder-color: rgba(255, 255, 255, 0.7);
+    --component-bg: rgba(255, 255, 255, 0.1);
+    --component-bg-focus: rgba(255, 255, 255, 0.25);
+    --component-shadow-focus: 0 0 15px rgba(0, 0, 0, 0.2);
+
+    --net-ok-global: #66CCFF;
+    --net-ok-local: #00EE00;
+    --net-fail: #EE0000;
+    --net-checking: #EEEE00;
+}
+
+/* --- 主题类 --- */
+.morning {
+    --current-theme-gradient: var(--morning-gradient);
+    --glow-intensity: 0.25;
+}
+.day {
+    --current-theme-gradient: var(--day-gradient);
+    --glow-intensity: 0.15;
+}
+.evening {
+    --current-theme-gradient: var(--evening-gradient);
+    --glow-intensity: 0.20;
+}
+.night {
+    --current-theme-gradient: var(--night-gradient);
+    --glow-intensity: 0.10;
+}

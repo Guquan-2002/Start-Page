@@ -1,0 +1,32 @@
+/* --- 基础与全局样式 --- */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "霞鹜文楷 GB 屏幕阅读版";
+    color: var(--text-color);
+    text-shadow: var(--text-shadow);
+    overflow: hidden;
+    background: var(--current-theme-gradient);
+    background-size: 400% 400%;
+    transition: background 2s ease-in-out;
+    animation: gradient-flow 8s ease-in-out infinite alternate;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse at 30% 70%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.5)) 0%, transparent 40%),
+        radial-gradient(ellipse at 70% 30%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.3)) 0%, transparent 30%);
+    opacity: 0.8;
+    animation: glow-drift 4s linear infinite alternate;
+    mix-blend-mode: soft-light;
+    will-change: transform;
+}
