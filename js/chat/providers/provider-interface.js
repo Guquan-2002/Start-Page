@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @typedef {Object} ProviderGenerateParams
  * @property {Object} config
  * @property {Array<{role: string, content: string}>} contextMessages
@@ -8,9 +8,14 @@
  */
 
 /**
+ * @typedef {{type: 'text-delta', text: string} | {type: 'fallback-key'} | {type: 'done'}} ProviderStreamEvent
+ */
+
+/**
  * @typedef {Object} ChatProvider
  * @property {string} id
  * @property {(params: ProviderGenerateParams) => Promise<{segments: string[]}>} generate
+ * @property {(params: ProviderGenerateParams) => AsyncGenerator<ProviderStreamEvent, void, void>} [generateStream]
  */
 
 /**
@@ -28,6 +33,10 @@ export function assertProvider(provider) {
 
     if (typeof provider.generate !== 'function') {
         throw new Error('Chat provider must expose generate(params).');
+    }
+
+    if ('generateStream' in provider && typeof provider.generateStream !== 'function') {
+        throw new Error('Chat provider generateStream must be a function when provided.');
     }
 
     return provider;

@@ -1,6 +1,8 @@
 ﻿import { buildContextPreview, buildContextWindow, normalizeMaxContextMessages } from './core/context-window.js';
 import { createChatMessage, createTurnId, getMessageDisplayContent } from './core/message-model.js';
+import { createMarkerStreamSplitter } from './core/marker-stream-splitter.js';
 import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from './core/prefix.js';
+import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from './constants.js';
 import { runPseudoStream } from './core/pseudo-stream.js';
 import { assertProvider } from './providers/provider-interface.js';
 
@@ -121,6 +123,27 @@ export function createApiManager({
         });
     }
 
+    function appendAssistantSegmentImmediate(segment, turnId, createdAt) {
+        const trimmedSegment = typeof segment === 'string' ? segment.trim() : '';
+        if (!trimmedSegment) {
+            return null;
+        }
+
+        const message = createChatMessage({
+            role: 'assistant',
+            content: trimmedSegment,
+            turnId,
+            metaOptions: {
+                createdAt
+            }
+        });
+
+        store.appendMessages([message]);
+        appendMessagesToUi([message]);
+        notifyConversationUpdated();
+        return message;
+    }
+
     function refillFailedInput(text) {
         chatInput.value = typeof text === 'string' ? text : '';
         resizeInputToContent(chatInput);
@@ -230,8 +253,21 @@ export function createApiManager({
         }, connectTimeoutMs);
 
         let timeoutCleared = false;
+        const clearConnectionTimeout = () => {
+            if (timeoutCleared) {
+                return;
+            }
 
-        try {
+            clearTimeout(timeoutId);
+            timeoutCleared = true;
+        };
+
+        const streamState = {
+            splitter: null,
+            persistedSegmentCount: 0
+        };
+
+        const consumeNonStreamingResponse = async () => {
             const response = await providerClient.generate({
                 config,
                 contextMessages: contextWindow.messages,
@@ -249,8 +285,7 @@ export function createApiManager({
                 return;
             }
 
-            clearTimeout(timeoutId);
-            timeoutCleared = true;
+            clearConnectionTimeout();
             loadingMessage.remove();
 
             const renderResult = await renderAssistantSegments(
@@ -268,10 +303,90 @@ export function createApiManager({
             if (renderResult.interrupted) {
                 ui.addSystemNotice('Generation stopped by user. Partial response kept.', 3200);
             }
-        } catch (error) {
+        };
+
+        const consumeStreamingResponse = async () => {
+            streamState.splitter = createMarkerStreamSplitter({
+                markers: [ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER]
+            });
+
+            let segmentIndex = 0;
+            const stream = providerClient.generateStream({
+                config,
+                contextMessages: contextWindow.messages,
+                signal: abortController.signal,
+                onRetryNotice: (attempt, maxRetries, delayMs) => {
+                    ui.showRetryNotice(attempt, maxRetries, delayMs);
+                },
+                onFallbackKey: () => {
+                    ui.showBackupKeyNotice();
+                }
+            });
+
+            for await (const event of stream) {
+                if (store.getActiveSessionId() !== requestSessionId) {
+                    loadingMessage.remove();
+                    return;
+                }
+
+                if (event?.type !== 'text-delta' || typeof event?.text !== 'string' || !event.text) {
+                    continue;
+                }
+
+                clearConnectionTimeout();
+                loadingMessage.remove();
+
+                const completedSegments = streamState.splitter.push(event.text);
+                for (const segment of completedSegments) {
+                    const appended = appendAssistantSegmentImmediate(segment, turnId, Date.now() + segmentIndex);
+                    if (appended) {
+                        segmentIndex += 1;
+                        streamState.persistedSegmentCount += 1;
+                    }
+                }
+            }
+
+            loadingMessage.remove();
+            clearConnectionTimeout();
+
+            const lastSegment = streamState.splitter.flush();
+            if (lastSegment) {
+                const appended = appendAssistantSegmentImmediate(lastSegment, turnId, Date.now() + segmentIndex);
+                if (appended) {
+                    streamState.persistedSegmentCount += 1;
+                }
+            }
+        };
+
+        const shouldUseStreaming = config.enablePseudoStream
+            && typeof providerClient.generateStream === 'function';
+
+        try {
+            if (shouldUseStreaming) {
+                await consumeStreamingResponse();
+            } else {
+                await consumeNonStreamingResponse();
+            }
+        } catch (rawError) {
+            let error = rawError;
+
             if (store.getActiveSessionId() !== requestSessionId) {
                 loadingMessage.remove();
                 return;
+            }
+
+            const shouldFallbackToNonStreaming = shouldUseStreaming
+                && streamState.persistedSegmentCount === 0
+                && error?.name !== 'AbortError';
+
+            if (shouldFallbackToNonStreaming) {
+                streamState.splitter?.discardRemainder();
+                try {
+                    await consumeNonStreamingResponse();
+                    return;
+                } catch (fallbackError) {
+                    error = fallbackError;
+                }
             }
 
             if (error?.name === 'AbortError') {
@@ -281,7 +396,12 @@ export function createApiManager({
                 if (abortReason === 'connect_timeout') {
                     showFailureMessage('Connection timeout', 'Check network status and Gemini API URL.', failedInputText);
                 } else if (abortReason === 'user') {
-                    ui.addSystemNotice('Generation stopped by user.');
+                    if (shouldUseStreaming) {
+                        streamState.splitter?.discardRemainder();
+                        ui.addSystemNotice('Generation stopped. Unmarked partial content was discarded.', 3200);
+                    } else {
+                        ui.addSystemNotice('Generation stopped by user.');
+                    }
                 }
             } else {
                 loadingMessage.remove();

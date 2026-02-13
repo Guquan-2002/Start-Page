@@ -84,6 +84,14 @@ function buildGeminiRequestBody(contextMessages, config, {
     return body;
 }
 
+function buildGeminiEndpoints(baseUrl, model) {
+    const encodedModel = encodeURIComponent(model);
+    return {
+        generate: `${baseUrl}/models/${encodedModel}:generateContent`,
+        stream: `${baseUrl}/models/${encodedModel}:streamGenerateContent?alt=sse`
+    };
+}
+
 async function readErrorDetails(response) {
     try {
         const errorPayload = await response.json();
@@ -180,6 +188,126 @@ async function fetchWithRetry(fetchImpl, url, options, {
     throw lastError || new Error('Request failed after retries');
 }
 
+function extractSseDataPayload(rawEvent) {
+    const lines = rawEvent.split(/\r?\n/);
+    const dataLines = [];
+
+    for (const line of lines) {
+        if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart());
+        }
+    }
+
+    if (dataLines.length === 0) {
+        return '';
+    }
+
+    return dataLines.join('\n');
+}
+
+async function* readSseJsonEvents(response, signal) {
+    const stream = response?.body;
+    if (!stream || typeof stream.getReader !== 'function') {
+        throw new Error('Gemini stream response body is empty.');
+    }
+
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+        while (true) {
+            if (signal?.aborted) {
+                throw createAbortError();
+            }
+
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+
+            while (true) {
+                const delimiterMatch = /\r?\n\r?\n/.exec(buffer);
+                if (!delimiterMatch) {
+                    break;
+                }
+
+                const rawEvent = buffer.slice(0, delimiterMatch.index);
+                buffer = buffer.slice(delimiterMatch.index + delimiterMatch[0].length);
+
+                const rawData = extractSseDataPayload(rawEvent);
+                if (!rawData || rawData === '[DONE]') {
+                    if (rawData === '[DONE]') {
+                        return;
+                    }
+                    continue;
+                }
+
+                try {
+                    yield JSON.parse(rawData);
+                } catch {
+                    // Ignore malformed SSE payloads.
+                }
+            }
+        }
+
+        buffer += decoder.decode();
+        const residualData = extractSseDataPayload(buffer.trim());
+        if (residualData && residualData !== '[DONE]') {
+            try {
+                yield JSON.parse(residualData);
+            } catch {
+                // Ignore malformed residual payload.
+            }
+        }
+    } finally {
+        reader.releaseLock?.();
+    }
+}
+
+function resolveStreamDelta(nextText, assembledText) {
+    if (!nextText) {
+        return {
+            deltaText: '',
+            mergedText: assembledText
+        };
+    }
+
+    if (!assembledText) {
+        return {
+            deltaText: nextText,
+            mergedText: nextText
+        };
+    }
+
+    if (nextText.startsWith(assembledText)) {
+        return {
+            deltaText: nextText.slice(assembledText.length),
+            mergedText: nextText
+        };
+    }
+
+    if (assembledText.startsWith(nextText) || assembledText.endsWith(nextText)) {
+        return {
+            deltaText: '',
+            mergedText: assembledText
+        };
+    }
+
+    return {
+        deltaText: nextText,
+        mergedText: `${assembledText}${nextText}`
+    };
+}
+
+function buildApiKeys(config) {
+    return [config.apiKey, config.backupApiKey]
+        .map((key) => (typeof key === 'string' ? key.trim() : ''))
+        .filter(Boolean);
+}
+
 export function createGeminiProvider({
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
@@ -201,10 +329,8 @@ export function createGeminiProvider({
                 throw new Error('Gemini model is required.');
             }
 
-            const endpoint = `${baseUrl}/models/${encodeURIComponent(config.model)}:generateContent`;
-            const apiKeys = [config.apiKey, config.backupApiKey]
-                .map((key) => (typeof key === 'string' ? key.trim() : ''))
-                .filter(Boolean);
+            const endpoints = buildGeminiEndpoints(baseUrl, config.model);
+            const apiKeys = buildApiKeys(config);
 
             if (!apiKeys.length) {
                 throw new Error('At least one API key is required.');
@@ -220,7 +346,7 @@ export function createGeminiProvider({
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoint, {
+                    const response = await fetchWithRetry(fetchImpl, endpoints.generate, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -266,6 +392,96 @@ export function createGeminiProvider({
             }
 
             throw lastError || new Error('Gemini request failed.');
+        },
+
+        async *generateStream({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
+            const baseUrl = normalizeApiUrl(config?.apiUrl);
+            if (!baseUrl) {
+                throw new Error('Gemini API URL is required.');
+            }
+
+            if (!config?.model) {
+                throw new Error('Gemini model is required.');
+            }
+
+            const endpoints = buildGeminiEndpoints(baseUrl, config.model);
+            const apiKeys = buildApiKeys(config);
+
+            if (!apiKeys.length) {
+                throw new Error('At least one API key is required.');
+            }
+
+            const enableMarkerSplit = config?.enablePseudoStream === true;
+            const requestBody = buildGeminiRequestBody(contextMessages, config, {
+                enableMarkerSplit
+            });
+            const hasBackupKey = apiKeys.length > 1;
+            let fallbackNoticeShown = false;
+            let emittedAnyDelta = false;
+            let lastError = null;
+
+            for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
+                let assembledText = '';
+
+                try {
+                    const response = await fetchWithRetry(fetchImpl, endpoints.stream, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'x-goog-api-key': apiKeys[keyIndex]
+                        },
+                        body: JSON.stringify(requestBody),
+                        signal
+                    }, {
+                        maxRetries,
+                        maxRetryDelayMs,
+                        onRetryNotice
+                    });
+
+                    if (!response.ok) {
+                        const details = await readErrorDetails(response);
+                        throw new Error(`HTTP ${response.status}: ${details}`);
+                    }
+
+                    for await (const payload of readSseJsonEvents(response, signal)) {
+                        const streamText = parseGeminiText(payload);
+                        const deltaResult = resolveStreamDelta(streamText, assembledText);
+                        assembledText = deltaResult.mergedText;
+
+                        if (!deltaResult.deltaText) {
+                            continue;
+                        }
+
+                        emittedAnyDelta = true;
+                        yield {
+                            type: 'text-delta',
+                            text: deltaResult.deltaText
+                        };
+                    }
+
+                    yield { type: 'done' };
+                    return;
+                } catch (error) {
+                    if (error?.name === 'AbortError') {
+                        throw error;
+                    }
+
+                    lastError = error;
+                    const canTryBackup = keyIndex === 0 && hasBackupKey && !emittedAnyDelta;
+                    if (canTryBackup) {
+                        if (!fallbackNoticeShown) {
+                            onFallbackKey?.();
+                            fallbackNoticeShown = true;
+                            yield { type: 'fallback-key' };
+                        }
+                        continue;
+                    }
+
+                    throw error;
+                }
+            }
+
+            throw lastError || new Error('Gemini stream request failed.');
         }
     };
 }
