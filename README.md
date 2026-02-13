@@ -6,7 +6,7 @@ A modular browser start page with dynamic themes, weather status, smart search e
 
 - Dynamic background theme based on local time (morning/day/evening/night)
 - Real-time clock and date display
-- Weather widget with configurable API key or proxy
+- Weather widget with configurable API key
 - Network-aware search engine switching (Google/Bing/offline)
 - Starfield background effects
 - AI chat panel with **Gemini-only** provider support
@@ -100,7 +100,7 @@ Chat sessions are stored under `llm_chat_history`.
 - Search grounding sources are not appended to chat bubbles and are not stored in chat context.
 - If assistant output includes `<|CHANGE_ROLE|>`, the response is split into multiple assistant messages.
 - Each split assistant segment is rendered as an independent bubble and stored as an independent context/history message.
-- Timestamp prefix messages are stored as independent context entries (not merged into the user text body).
+- Timestamp prefix messages are stored as independent context entrie.
 
 ## Weather API Configuration
 
@@ -234,6 +234,10 @@ export const CONFIG = {
 ## License
 
 MIT License
+
+## Vibe Coding
+
+Gemini, Codex and Claude Code are used.
 
 ## Changelog
 
