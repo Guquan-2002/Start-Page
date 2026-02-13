@@ -112,7 +112,8 @@ export function buildMessageMeta(content, {
     tokenEstimate = null,
     displayRole = '',
     isPrefixMessage = false,
-    prefixType = ''
+    prefixType = '',
+    interrupted = false
 } = {}) {
     const normalizedContent = typeof content === 'string' ? content : '';
     const normalizedContextContent = asTrimmedString(contextContent);
@@ -149,6 +150,10 @@ export function buildMessageMeta(content, {
     const normalizedPrefixType = asTrimmedString(prefixType);
     if (normalizedPrefixType) {
         meta.prefixType = normalizedPrefixType;
+    }
+
+    if (interrupted === true) {
+        meta.interrupted = true;
     }
 
     return meta;
@@ -217,7 +222,8 @@ export function normalizeChatMessage(rawMessage, {
         tokenEstimate: Number.isFinite(normalizedCore.rawMeta.tokenEstimate) ? normalizedCore.rawMeta.tokenEstimate : null,
         displayRole: normalizedCore.rawMeta.displayRole,
         isPrefixMessage: normalizedCore.rawMeta.isPrefixMessage === true,
-        prefixType: normalizedCore.rawMeta.prefixType
+        prefixType: normalizedCore.rawMeta.prefixType,
+        interrupted: normalizedCore.rawMeta.interrupted === true
     });
 
     return {

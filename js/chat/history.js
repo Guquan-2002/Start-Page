@@ -2,6 +2,8 @@
     store,
     elements,
     onSessionActivated,
+    onSessionDeleted = null,
+    onSessionsCleared = null,
     isSessionOperationBlocked = null,
     onBlockedSessionOperation = null
 }) {
@@ -66,6 +68,10 @@
             return;
         }
 
+        if (typeof onSessionDeleted === 'function') {
+            onSessionDeleted(sessionId);
+        }
+
         onSessionActivated?.();
         renderHistoryList();
     }
@@ -85,7 +91,13 @@
             return;
         }
 
+        const deletedSessionIds = sortedSessions.map(({ sessionId }) => sessionId);
         store.clearAllSessions();
+
+        if (typeof onSessionsCleared === 'function') {
+            onSessionsCleared(deletedSessionIds);
+        }
+
         onSessionActivated?.();
         renderHistoryList();
     }

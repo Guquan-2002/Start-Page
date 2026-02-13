@@ -1,7 +1,7 @@
 ﻿import { $ } from './utils.js';
-import { CHAT_HISTORY_KEY, CHAT_LIMITS, CHAT_STORAGE_KEY } from './chat/constants.js';
+import { CHAT_DRAFTS_KEY, CHAT_HISTORY_KEY, CHAT_LIMITS, CHAT_STORAGE_KEY } from './chat/constants.js';
 import { createConfigManager } from './chat/config.js';
-import { setupMarked, renderMarkdown, escapeHtml } from './chat/markdown.js';
+import { setupMarked, renderMarkdown } from './chat/markdown.js';
 import { createUiManager } from './chat/ui.js';
 import { createHistoryManager } from './chat/history.js';
 import { createApiManager } from './chat/api.js';
@@ -9,6 +9,7 @@ import { initCustomSelect } from './chat/custom-select.js';
 import { createSessionStore } from './chat/state/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
 import { createGeminiProvider } from './chat/providers/gemini-provider.js';
+import { createDraftManager } from './chat/storage/draft-storage.js';
 
 function getChatElements() {
     return {
@@ -36,16 +37,22 @@ function getChatElements() {
         cfgPrompt: $('#cfg-system-prompt'),
         cfgThinkingBudget: $('#cfg-thinking-budget'),
         cfgSearchMode: $('#cfg-search-mode'),
+        cfgEnablePseudoStream: $('#cfg-enable-pseudo-stream'),
+        cfgEnableDraftAutosave: $('#cfg-enable-draft-autosave'),
         cfgPrefixWithTime: $('#cfg-prefix-with-time'),
         cfgPrefixWithName: $('#cfg-prefix-with-name'),
         cfgUserName: $('#cfg-user-name')
     };
 }
 
+function resizeChatInput(chatInput) {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+}
+
 function setupInputAutosize(chatInput) {
     chatInput.addEventListener('input', () => {
-        chatInput.style.height = 'auto';
-        chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+        resizeChatInput(chatInput);
     });
 }
 
@@ -54,6 +61,10 @@ export function initChat() {
     const store = createSessionStore({
         storage: globalThis.localStorage,
         historyKey: CHAT_HISTORY_KEY
+    });
+    const draftManager = createDraftManager({
+        storage: globalThis.localStorage,
+        storageKey: CHAT_DRAFTS_KEY
     });
 
     const configManager = createConfigManager({
@@ -64,15 +75,61 @@ export function initChat() {
         cfgPrompt: elements.cfgPrompt,
         cfgThinkingBudget: elements.cfgThinkingBudget,
         cfgSearchMode: elements.cfgSearchMode,
+        cfgEnablePseudoStream: elements.cfgEnablePseudoStream,
+        cfgEnableDraftAutosave: elements.cfgEnableDraftAutosave,
         cfgPrefixWithTime: elements.cfgPrefixWithTime,
         cfgPrefixWithName: elements.cfgPrefixWithName,
         cfgUserName: elements.cfgUserName
     }, CHAT_STORAGE_KEY);
 
     let historyManager = null;
+    let draftSaveTimerId = null;
+
+    const getRuntimeConfig = () => configManager.getConfig();
 
     const renderActiveConversation = () => {
         ui.renderConversation(store.getActiveMessages(), getMessageDisplayContent);
+    };
+
+    const restoreDraftForActiveSession = () => {
+        const config = getRuntimeConfig();
+        if (!config.enableDraftAutosave) {
+            elements.chatInput.value = '';
+            resizeChatInput(elements.chatInput);
+            return;
+        }
+
+        const activeSessionId = store.getActiveSessionId();
+        const draftText = draftManager.getDraft(activeSessionId);
+        elements.chatInput.value = draftText;
+        resizeChatInput(elements.chatInput);
+    };
+
+    const scheduleDraftSave = () => {
+        clearTimeout(draftSaveTimerId);
+
+        const config = getRuntimeConfig();
+        if (!config.enableDraftAutosave) {
+            return;
+        }
+
+        const sessionId = store.getActiveSessionId();
+        const draftText = elements.chatInput.value;
+
+        draftSaveTimerId = setTimeout(() => {
+            draftManager.setDraft(sessionId, draftText);
+        }, 250);
+    };
+
+    const saveDraftImmediately = () => {
+        clearTimeout(draftSaveTimerId);
+
+        const config = getRuntimeConfig();
+        if (!config.enableDraftAutosave) {
+            return;
+        }
+
+        draftManager.setDraft(store.getActiveSessionId(), elements.chatInput.value);
     };
 
     const ui = createUiManager({
@@ -103,9 +160,9 @@ export function initChat() {
 
             renderActiveConversation();
             elements.chatInput.value = rollbackResult.retryContent || content;
-            elements.chatInput.style.height = 'auto';
-            elements.chatInput.style.height = `${Math.min(elements.chatInput.scrollHeight, 120)}px`;
+            resizeChatInput(elements.chatInput);
             elements.chatInput.focus();
+            saveDraftImmediately();
 
             historyManager?.renderHistoryList();
         }
@@ -123,7 +180,14 @@ export function initChat() {
         },
         onSessionActivated: () => {
             renderActiveConversation();
+            restoreDraftForActiveSession();
             historyManager.renderHistoryList();
+        },
+        onSessionDeleted: (sessionId) => {
+            draftManager.removeDraft(sessionId);
+        },
+        onSessionsCleared: () => {
+            draftManager.clearAllDrafts();
         },
         isSessionOperationBlocked: () => store.isStreaming(),
         onBlockedSessionOperation: notifySessionBusy
@@ -147,9 +211,12 @@ export function initChat() {
             maxContextTokens: CHAT_LIMITS.maxContextTokens,
             maxContextMessages: CHAT_LIMITS.maxContextMessages
         },
-        escapeHtml,
         onConversationUpdated: () => {
             historyManager.renderHistoryList();
+        },
+        onUserMessageAccepted: ({ sessionId }) => {
+            clearTimeout(draftSaveTimerId);
+            draftManager.removeDraft(sessionId);
         }
     });
 
@@ -165,6 +232,10 @@ export function initChat() {
 
     setupMarked();
     setupInputAutosize(elements.chatInput);
+
+    elements.chatInput.addEventListener('input', scheduleDraftSave);
+    elements.chatInput.addEventListener('blur', saveDraftImmediately);
+    globalThis.addEventListener('beforeunload', saveDraftImmediately);
 
     elements.toggleBtn.addEventListener('click', () => {
         elements.panel.classList.remove('chat-hidden');
@@ -191,6 +262,16 @@ export function initChat() {
 
     elements.saveBtn.addEventListener('click', () => {
         configManager.saveConfig();
+
+        const latestConfig = getRuntimeConfig();
+        if (!latestConfig.enableDraftAutosave) {
+            clearTimeout(draftSaveTimerId);
+        }
+
+        if (latestConfig.enableDraftAutosave && !elements.chatInput.value.trim()) {
+            restoreDraftForActiveSession();
+        }
+
         closeSettings();
     });
 
@@ -264,5 +345,6 @@ export function initChat() {
 
     store.initialize();
     renderActiveConversation();
+    restoreDraftForActiveSession();
     historyManager.renderHistoryList();
 }

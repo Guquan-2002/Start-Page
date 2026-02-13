@@ -113,3 +113,24 @@ test('session CRUD operations are consistent', () => {
     assert.equal(store.getSortedSessions().length, 1);
     assert.equal(store.getActiveMessages().length, 0);
 });
+
+test('streaming state transitions remain valid for orchestration flow', () => {
+    const storage = createMemoryStorage();
+    const store = createSessionStore({ storage, now: () => 1700000000000 });
+    store.initialize();
+
+    const controller = new AbortController();
+    store.startStreaming(controller);
+
+    assert.equal(store.isStreaming(), true);
+    assert.equal(store.getAbortController(), controller);
+
+    const aborted = store.requestAbort('user');
+    assert.equal(aborted, true);
+    assert.equal(controller.signal.aborted, true);
+    assert.equal(store.getAbortReason(), 'user');
+
+    store.finishStreaming();
+    assert.equal(store.isStreaming(), false);
+    assert.equal(store.getAbortController(), null);
+});

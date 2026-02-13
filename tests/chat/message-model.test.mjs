@@ -72,3 +72,18 @@ test('splitAssistantMessageByMarker returns trimmed segments', () => {
     const segments = splitAssistantMessageByMarker('one\n<|CHANGE_ROLE|>\n two ');
     assert.deepEqual(segments, ['one', 'two']);
 });
+
+test('normalizeChatMessage keeps interrupted meta flag', () => {
+    const normalized = normalizeChatMessage({
+        role: 'assistant',
+        content: 'partial answer',
+        meta: {
+            interrupted: true
+        }
+    }, {
+        defaultTurnId: 'turn_interrupted'
+    });
+
+    assert.ok(normalized);
+    assert.equal(normalized.meta.interrupted, true);
+});

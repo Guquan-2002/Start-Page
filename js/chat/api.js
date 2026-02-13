@@ -1,6 +1,7 @@
 ﻿import { buildContextPreview, buildContextWindow, normalizeMaxContextMessages } from './core/context-window.js';
 import { createChatMessage, createTurnId, getMessageDisplayContent } from './core/message-model.js';
 import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from './core/prefix.js';
+import { runPseudoStream } from './core/pseudo-stream.js';
 import { assertProvider } from './providers/provider-interface.js';
 
 const CONTEXT_DEBUG_STORAGE_KEY = 'llm_chat_context_debug';
@@ -65,6 +66,11 @@ function logContextWindowDebug(contextWindow, config) {
     });
 }
 
+function resizeInputToContent(chatInput) {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+}
+
 export function createApiManager({
     store,
     elements,
@@ -72,8 +78,8 @@ export function createApiManager({
     configManager,
     provider,
     constants,
-    escapeHtml,
-    onConversationUpdated = null
+    onConversationUpdated = null,
+    onUserMessageAccepted = null
 }) {
     const providerClient = assertProvider(provider);
 
@@ -115,7 +121,88 @@ export function createApiManager({
         });
     }
 
-    async function generateAssistantResponse(config, turnId) {
+    function refillFailedInput(text) {
+        chatInput.value = typeof text === 'string' ? text : '';
+        resizeInputToContent(chatInput);
+        chatInput.focus();
+    }
+
+    function showFailureMessage(title, detail, failedInputText) {
+        ui.addErrorMessage({
+            title,
+            detail,
+            actionLabel: failedInputText ? '回填输入框' : '',
+            onAction: failedInputText
+                ? () => refillFailedInput(failedInputText)
+                : null
+        });
+    }
+
+    async function renderAssistantSegments(segments, turnId, config, signal) {
+        const createdAt = Date.now();
+        const assistantMessages = [];
+        let interrupted = false;
+
+        for (let index = 0; index < segments.length; index += 1) {
+            const segment = segments[index];
+            const segmentCreatedAt = createdAt + index;
+
+            if (!config.enablePseudoStream) {
+                const message = createChatMessage({
+                    role: 'assistant',
+                    content: segment,
+                    turnId,
+                    metaOptions: {
+                        createdAt: segmentCreatedAt
+                    }
+                });
+                assistantMessages.push(message);
+                continue;
+            }
+
+            const streamMessageEl = ui.createAssistantStreamingMessage();
+            const streamResult = await runPseudoStream({
+                text: segment,
+                signal,
+                baseDelayMs: 20,
+                onProgress: (nextText) => {
+                    ui.updateAssistantStreamingMessage(streamMessageEl, nextText);
+                }
+            });
+
+            ui.finalizeAssistantStreamingMessage(streamMessageEl, streamResult.renderedText, {
+                interrupted: streamResult.interrupted
+            });
+
+            if (streamResult.renderedText) {
+                assistantMessages.push(createChatMessage({
+                    role: 'assistant',
+                    content: streamResult.renderedText,
+                    turnId,
+                    metaOptions: {
+                        createdAt: segmentCreatedAt,
+                        interrupted: streamResult.interrupted
+                    }
+                }));
+            }
+
+            if (streamResult.interrupted) {
+                interrupted = true;
+                break;
+            }
+        }
+
+        if (!config.enablePseudoStream && assistantMessages.length > 0) {
+            appendMessagesToUi(assistantMessages);
+        }
+
+        return {
+            assistantMessages,
+            interrupted
+        };
+    }
+
+    async function generateAssistantResponse(config, turnId, failedInputText) {
         const requestSessionId = store.getActiveSessionId();
         const effectiveMaxContextMessages = resolveContextMaxMessages(maxContextMessages);
         const contextWindow = buildContextWindow(
@@ -142,6 +229,8 @@ export function createApiManager({
             abortController.abort();
         }, connectTimeoutMs);
 
+        let timeoutCleared = false;
+
         try {
             const response = await providerClient.generate({
                 config,
@@ -160,21 +249,25 @@ export function createApiManager({
                 return;
             }
 
+            clearTimeout(timeoutId);
+            timeoutCleared = true;
             loadingMessage.remove();
 
-            const createdAt = Date.now();
-            const assistantMessages = response.segments.map((segment, index) => createChatMessage({
-                role: 'assistant',
-                content: segment,
+            const renderResult = await renderAssistantSegments(
+                response.segments,
                 turnId,
-                metaOptions: {
-                    createdAt: createdAt + index
-                }
-            }));
+                config,
+                abortController.signal
+            );
 
-            store.appendMessages(assistantMessages);
-            appendMessagesToUi(assistantMessages);
-            notifyConversationUpdated();
+            if (renderResult.assistantMessages.length > 0) {
+                store.appendMessages(renderResult.assistantMessages);
+                notifyConversationUpdated();
+            }
+
+            if (renderResult.interrupted) {
+                ui.addSystemNotice('Generation stopped by user. Partial response kept.', 3200);
+            }
         } catch (error) {
             if (store.getActiveSessionId() !== requestSessionId) {
                 loadingMessage.remove();
@@ -183,20 +276,22 @@ export function createApiManager({
 
             if (error?.name === 'AbortError') {
                 const abortReason = store.getAbortReason();
+                loadingMessage.remove();
+
                 if (abortReason === 'connect_timeout') {
-                    loadingMessage.className = 'chat-msg error';
-                    loadingMessage.innerHTML = 'Connection timeout<br><small>Check network status and Gemini API URL.</small>';
+                    showFailureMessage('Connection timeout', 'Check network status and Gemini API URL.', failedInputText);
                 } else if (abortReason === 'user') {
-                    loadingMessage.remove();
                     ui.addSystemNotice('Generation stopped by user.');
                 }
             } else {
-                loadingMessage.className = 'chat-msg error';
-                const message = error?.message || 'Unknown error';
-                loadingMessage.innerHTML = `Request failed<br><small>${escapeHtml(message)}</small>`;
+                loadingMessage.remove();
+                showFailureMessage('Request failed', error?.message || 'Unknown error', failedInputText);
             }
         } finally {
-            clearTimeout(timeoutId);
+            if (!timeoutCleared) {
+                clearTimeout(timeoutId);
+            }
+
             loadingMessage.classList.remove('typing');
             store.finishStreaming();
             ui.setStreamingUI(false);
@@ -228,6 +323,14 @@ export function createApiManager({
             ui.addMessage('error', 'Only Gemini provider is currently supported.');
             settingsDiv.classList.remove('chat-settings-hidden');
             return;
+        }
+
+        const activeSessionId = store.getActiveSessionId();
+        if (typeof onUserMessageAccepted === 'function') {
+            onUserMessageAccepted({
+                sessionId: activeSessionId,
+                text
+            });
         }
 
         const userCreatedAt = Date.now();
@@ -271,9 +374,9 @@ export function createApiManager({
         notifyConversationUpdated();
 
         chatInput.value = '';
-        chatInput.style.height = 'auto';
+        resizeInputToContent(chatInput);
 
-        await generateAssistantResponse(config, turnId);
+        await generateAssistantResponse(config, turnId, text);
     }
 
     function stopGeneration() {

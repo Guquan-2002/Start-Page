@@ -37,6 +37,8 @@ function normalizeStoredConfig(raw) {
         systemPrompt: typeof raw.systemPrompt === 'string' ? raw.systemPrompt : GEMINI_DEFAULTS.systemPrompt,
         thinkingBudget: parsePositiveInteger(raw.thinkingBudget),
         searchMode: typeof raw.searchMode === 'string' ? raw.searchMode : GEMINI_DEFAULTS.searchMode,
+        enablePseudoStream: parseBoolean(raw.enablePseudoStream, GEMINI_DEFAULTS.enablePseudoStream),
+        enableDraftAutosave: parseBoolean(raw.enableDraftAutosave, GEMINI_DEFAULTS.enableDraftAutosave),
         prefixWithTime: parseBoolean(raw.prefixWithTime, GEMINI_DEFAULTS.prefixWithTime),
         prefixWithName: parseBoolean(raw.prefixWithName, GEMINI_DEFAULTS.prefixWithName),
         userName: normalizeNameField(raw.userName, GEMINI_DEFAULTS.userName)
@@ -52,6 +54,8 @@ export function createConfigManager(elements, storageKey) {
         cfgPrompt,
         cfgThinkingBudget,
         cfgSearchMode,
+        cfgEnablePseudoStream,
+        cfgEnableDraftAutosave,
         cfgPrefixWithTime,
         cfgPrefixWithName,
         cfgUserName
@@ -64,6 +68,15 @@ export function createConfigManager(elements, storageKey) {
         cfgModel.value = config.model;
         cfgPrompt.value = config.systemPrompt;
         cfgThinkingBudget.value = config.thinkingBudget ?? '';
+
+        if (cfgEnablePseudoStream) {
+            cfgEnablePseudoStream.checked = config.enablePseudoStream;
+        }
+
+        if (cfgEnableDraftAutosave) {
+            cfgEnableDraftAutosave.checked = config.enableDraftAutosave;
+        }
+
         cfgPrefixWithTime.checked = config.prefixWithTime;
         cfgPrefixWithName.checked = config.prefixWithName;
         cfgUserName.value = config.userName;
@@ -83,6 +96,8 @@ export function createConfigManager(elements, storageKey) {
             systemPrompt: cfgPrompt.value,
             thinkingBudget: cfgThinkingBudget.value,
             searchMode: cfgSearchMode ? cfgSearchMode.value : GEMINI_DEFAULTS.searchMode,
+            enablePseudoStream: cfgEnablePseudoStream ? cfgEnablePseudoStream.checked : GEMINI_DEFAULTS.enablePseudoStream,
+            enableDraftAutosave: cfgEnableDraftAutosave ? cfgEnableDraftAutosave.checked : GEMINI_DEFAULTS.enableDraftAutosave,
             prefixWithTime: cfgPrefixWithTime.checked,
             prefixWithName: cfgPrefixWithName.checked,
             userName: cfgUserName.value

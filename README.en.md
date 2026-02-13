@@ -1,6 +1,6 @@
 ﻿# Start Page
 
-A browser start page built with native ES Modules, featuring dynamic themes, weather, network-aware search, and a Gemini chat panel.
+A browser start page built with native ES Modules, featuring dynamic themes, weather, network-aware search, and Gemini Chat.  
 Chinese version: [README.md](README.md)
 
 ## Highlights
@@ -12,8 +12,11 @@ Chinese version: [README.md](README.md)
 - Starfield visual effects
 - Gemini chat panel (Gemini-only; no OpenAI/Anthropic)
 - Chat session management (create / switch / rename / delete / clear)
-- Retry by `turn` (regenerate from a selected user turn)
+- Retry by `turnId` (regenerate from a selected user turn)
 - Chat context window controls (message count + token budget)
+- Pseudo-stream output (toggleable, front-end progressive rendering)
+- Per-session draft autosave (toggleable, restored on switch/reload)
+- One-click "Refill input" on error bubble (refill only, no auto-send)
 - Node built-in tests for chat core logic
 
 ## Tech Stack
@@ -22,7 +25,7 @@ Chinese version: [README.md](README.md)
 - Vanilla JavaScript (ES Modules)
 - Fetch API
 - `localStorage` persistence
-- Marked + highlight.js for markdown and code rendering in chat
+- Marked + highlight.js for markdown/code rendering in chat
 
 ## Project Structure
 
@@ -61,11 +64,13 @@ home/
 |       |-- core/
 |       |   |-- message-model.js
 |       |   |-- context-window.js
-|       |   `-- prefix.js
+|       |   |-- prefix.js
+|       |   `-- pseudo-stream.js
 |       |-- state/
 |       |   `-- session-store.js
 |       |-- storage/
-|       |   `-- history-storage.js
+|       |   |-- history-storage.js
+|       |   `-- draft-storage.js
 |       `-- providers/
 |           |-- provider-interface.js
 |           `-- gemini-provider.js
@@ -74,17 +79,21 @@ home/
 |       |-- message-model.test.mjs
 |       |-- context-window.test.mjs
 |       |-- session-store.test.mjs
-|       `-- gemini-provider.test.mjs
-`-- README.md
+|       |-- gemini-provider.test.mjs
+|       |-- pseudo-stream.test.mjs
+|       `-- draft-storage.test.mjs
+|-- README.md
+`-- README.en.md
 ```
 
 ## Chat Architecture Layers
 
-- `js/chat.js`: composition root (wires store / provider / UI / history / config)
-- `js/chat/state/session-store.js`: single source of truth for sessions + streaming state
+- `js/chat.js`: composition root (wires store / provider / UI / history / config / drafts)
+- `js/chat/state/session-store.js`: single state entry for sessions + generation lifecycle
 - `js/chat/storage/history-storage.js`: `llm_chat_history_v2` read/write and schema normalization
-- `js/chat/core/*`: pure logic (message model, prefixes, context window)
-- `js/chat/providers/gemini-provider.js`: Gemini calls, retry, backup-key fallback, error handling
+- `js/chat/storage/draft-storage.js`: `llm_chat_drafts_v1` draft read/write and normalization
+- `js/chat/core/*`: pure logic (message model, prefixes, context window, pseudo-stream chunking/runner)
+- `js/chat/providers/gemini-provider.js`: Gemini requests, retry, backup-key fallback, error handling
 - `js/chat/ui.js` + `js/chat/history.js`: rendering and interaction control (no direct persistence)
 
 ## Quick Start
@@ -143,13 +152,18 @@ Configure in chat settings:
 - System prompt
 - Thinking budget (optional)
 - Web search (optional, Gemini Google Search)
+- Experience toggles (pseudo-stream, draft autosave)
 - Message prefix (timestamp, user name)
 
 ## Chat Behavior Notes
 
-- Gemini is the only active provider (interface is prepared for future extension)
+- Gemini is the only active provider (interface is ready for future extension)
 - Sessions are persisted in `llm_chat_history_v2` (schema version 2)
-- Assistant output containing `<|CHANGE_ROLE|>` is split into multiple assistant messages
+- Drafts are persisted per session in `llm_chat_drafts_v1`
+- Assistant output containing `<|CHANGE_ROLE|>` is split into multiple segments
+- With pseudo-stream enabled: full response is fetched first, then progressively rendered
+- Stop behavior: abort during request; stop render loop during pseudo-stream and keep partial output
+- Request failures show an error bubble with a "Refill input" action
 - Retry on a user message rolls back by `turnId` (that turn and all later messages)
 - Session operations are blocked while generation is in progress
 
@@ -157,6 +171,7 @@ Configure in chat settings:
 
 - `llm_chat_config`: chat configuration
 - `llm_chat_history_v2`: chat session history (v2)
+- `llm_chat_drafts_v1`: chat drafts (per session)
 - `startpage_config`: runtime settings (weather, etc.)
 
 ## Debug Flags (Optional)

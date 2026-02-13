@@ -64,12 +64,9 @@
         messagesEl.innerHTML = '';
     }
 
-    function addMessage(role, text, meta = null, identifiers = {}) {
-        const displayRole = typeof meta?.displayRole === 'string' ? meta.displayRole : role;
-        const shouldShowRetry = role === 'user' && displayRole === 'user' && !meta?.isPrefixMessage;
-
+    function buildMessageElement(role, displayRole, identifiers = {}) {
         const messageElement = document.createElement('div');
-        messageElement.className = `chat-msg ${displayRole}`;
+        messageElement.className = `chat-msg ${displayRole || role}`;
 
         const messageId = typeof identifiers?.messageId === 'string' ? identifiers.messageId : '';
         const turnId = typeof identifiers?.turnId === 'string' ? identifiers.turnId : '';
@@ -82,6 +79,21 @@
             messageElement.dataset.turnId = turnId;
         }
 
+        return messageElement;
+    }
+
+    function appendMessageElement(messageElement) {
+        messagesEl.appendChild(messageElement);
+        pruneOldMessages();
+        scrollToBottom(false);
+        return messageElement;
+    }
+
+    function addMessage(role, text, meta = null, identifiers = {}) {
+        const displayRole = typeof meta?.displayRole === 'string' ? meta.displayRole : role;
+        const shouldShowRetry = role === 'user' && displayRole === 'user' && !meta?.isPrefixMessage;
+        const messageElement = buildMessageElement(role, displayRole, identifiers);
+
         if (displayRole === 'assistant' && text) {
             messageElement.innerHTML = renderMarkdown(text);
             addCopyButtons(messageElement);
@@ -89,7 +101,7 @@
             messageElement.textContent = text;
         }
 
-        if (shouldShowRetry && turnId) {
+        if (shouldShowRetry && identifiers?.turnId) {
             const retryButton = document.createElement('button');
             retryButton.className = 'msg-retry-btn';
             retryButton.innerHTML = '<i class="fas fa-redo"></i>';
@@ -101,8 +113,8 @@
                 }
 
                 handleRetryRequested({
-                    turnId,
-                    messageId,
+                    turnId: identifiers.turnId,
+                    messageId: identifiers.messageId,
                     content: text
                 });
             });
@@ -110,10 +122,7 @@
             messageElement.appendChild(retryButton);
         }
 
-        messagesEl.appendChild(messageElement);
-        pruneOldMessages();
-        scrollToBottom(false);
-        return messageElement;
+        return appendMessageElement(messageElement);
     }
 
     function addLoadingMessage() {
@@ -121,6 +130,77 @@
         loadingMessage.innerHTML = '<span class="chat-loading"><span></span><span></span><span></span></span>';
         loadingMessage.classList.add('typing');
         return loadingMessage;
+    }
+
+    function createAssistantStreamingMessage(identifiers = {}) {
+        const messageElement = buildMessageElement('assistant', 'assistant', identifiers);
+        messageElement.classList.add('is-streaming');
+        messageElement.textContent = '';
+        return appendMessageElement(messageElement);
+    }
+
+    function updateAssistantStreamingMessage(messageElement, text) {
+        if (!messageElement || !messageElement.isConnected) {
+            return;
+        }
+
+        messageElement.textContent = text;
+        scrollToBottom(false);
+    }
+
+    function finalizeAssistantStreamingMessage(messageElement, text, { interrupted = false } = {}) {
+        if (!messageElement || !messageElement.isConnected) {
+            return;
+        }
+
+        messageElement.classList.remove('is-streaming');
+
+        if (interrupted) {
+            messageElement.classList.add('is-interrupted');
+        } else {
+            messageElement.classList.remove('is-interrupted');
+        }
+
+        if (!text) {
+            messageElement.remove();
+            return;
+        }
+
+        messageElement.innerHTML = renderMarkdown(text);
+        addCopyButtons(messageElement);
+        scrollToBottom(false);
+    }
+
+    function addErrorMessage({
+        title,
+        detail = '',
+        actionLabel = '',
+        onAction = null
+    }) {
+        const messageElement = buildMessageElement('error', 'error');
+
+        const titleElement = document.createElement('div');
+        titleElement.className = 'chat-error-title';
+        titleElement.textContent = title;
+        messageElement.appendChild(titleElement);
+
+        if (detail) {
+            const detailElement = document.createElement('div');
+            detailElement.className = 'chat-error-detail';
+            detailElement.textContent = detail;
+            messageElement.appendChild(detailElement);
+        }
+
+        if (actionLabel && typeof onAction === 'function') {
+            const actionButton = document.createElement('button');
+            actionButton.type = 'button';
+            actionButton.className = 'chat-error-action';
+            actionButton.textContent = actionLabel;
+            actionButton.addEventListener('click', onAction);
+            messageElement.appendChild(actionButton);
+        }
+
+        return appendMessageElement(messageElement);
     }
 
     function renderConversation(messages, resolveDisplayContent) {
@@ -191,14 +271,18 @@
 
     return {
         addCopyButtons,
+        addErrorMessage,
         addLoadingMessage,
         addMessage,
         addSystemNotice,
         clearMessages,
+        createAssistantStreamingMessage,
+        finalizeAssistantStreamingMessage,
         renderConversation,
         scrollToBottom,
         setStreamingUI,
         showRetryNotice,
-        showBackupKeyNotice
+        showBackupKeyNotice,
+        updateAssistantStreamingMessage
     };
 }

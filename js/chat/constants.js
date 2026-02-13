@@ -1,5 +1,6 @@
 ﻿export const CHAT_STORAGE_KEY = 'llm_chat_config';
 export const CHAT_HISTORY_KEY = 'llm_chat_history_v2';
+export const CHAT_DRAFTS_KEY = 'llm_chat_drafts_v1';
 export const CHAT_SCHEMA_VERSION = 2;
 export const SOURCES_MARKDOWN_MARKER = '\n\n---\n**Sources**\n';
 export const ASSISTANT_SEGMENT_MARKER = '<|CHANGE_ROLE|>';
@@ -18,6 +19,8 @@ export const GEMINI_DEFAULTS = Object.freeze({
     systemPrompt: 'You are a helpful assistant.',
     searchMode: '',
     thinkingBudget: null,
+    enablePseudoStream: true,
+    enableDraftAutosave: true,
     prefixWithTime: false,
     prefixWithName: false,
     userName: 'User'
