@@ -1,6 +1,6 @@
 ﻿# Start Page
 
-一个基于原生 ES Modules 的浏览器起始页，集成动态主题、天气、网络感知搜索和 Gemini Chat。  
+一个基于原生 ES Modules 的浏览器起始页，集成动态主题、天气、网络感知搜索和多 Provider Chat（Gemini / OpenAI / Anthropic）。
 English version: [README.en.md](README.en.md)
 
 ## 功能亮点
@@ -10,13 +10,14 @@ English version: [README.en.md](README.en.md)
 - 天气组件（支持 API Key 或代理模式）
 - 网络状态检测 + 搜索引擎自动切换（Google / Bing / 离线）
 - 星空背景特效
-- Gemini 聊天（仅 Gemini，不支持 OpenAI/Anthropic）
+- 多 Provider 聊天（Gemini / OpenAI / Anthropic）
 - 聊天会话管理（新建 / 切换 / 重命名 / 删除 / 清空）
 - 按 `turnId` 回退重试（从指定用户轮次重新生成）
 - 聊天上下文窗口控制（消息数 + Token 预算）
 - 伪流式输出（可开关，前端分段渲染）
 - 按会话草稿自动保存（可开关，切换/刷新可恢复）
 - 失败气泡一键“回填输入框”（仅回填，不自动发送）
+- Provider 独立配置档案（切换 Provider 自动回填 URL/Key/Model/Thinking/Search；OpenAI Reasoning Effort 可保存）
 - Node 内置测试覆盖 chat 核心逻辑
 
 ## 技术栈
@@ -63,6 +64,7 @@ home/
 |       |-- ui.js
 |       |-- core/
 |       |   |-- message-model.js
+|       |   |-- marker-stream-splitter.js
 |       |   |-- context-window.js
 |       |   |-- prefix.js
 |       |   `-- pseudo-stream.js
@@ -73,13 +75,21 @@ home/
 |       |   `-- draft-storage.js
 |       `-- providers/
 |           |-- provider-interface.js
-|           `-- gemini-provider.js
+|           |-- provider-router.js
+|           |-- gemini-provider.js
+|           |-- openai-provider.js
+|           `-- anthropic-provider.js
 |-- tests/
 |   `-- chat/
+|       |-- anthropic-provider.test.mjs
+|       |-- config-manager.test.mjs
 |       |-- message-model.test.mjs
 |       |-- context-window.test.mjs
 |       |-- session-store.test.mjs
+|       |-- gemini-provider-stream.test.mjs
 |       |-- gemini-provider.test.mjs
+|       |-- openai-provider.test.mjs
+|       |-- marker-stream-splitter.test.mjs
 |       |-- pseudo-stream.test.mjs
 |       `-- draft-storage.test.mjs
 |-- README.md
@@ -93,7 +103,8 @@ home/
 - `js/chat/storage/history-storage.js`：`llm_chat_history_v2` 读写与 schema 归一化
 - `js/chat/storage/draft-storage.js`：`llm_chat_drafts_v1` 草稿读写与归一化
 - `js/chat/core/*`：纯逻辑（消息模型、前缀、上下文窗口、伪流式分块/执行）
-- `js/chat/providers/gemini-provider.js`：Gemini 调用、重试、fallback key、错误处理
+- `js/chat/providers/provider-router.js`：按 `config.provider` 路由到 Gemini/OpenAI/Anthropic
+- `js/chat/providers/*-provider.js`：Provider 请求、流式/非流式、重试、fallback key、错误处理
 - `js/chat/ui.js` + `js/chat/history.js`：渲染与交互控制（不直接持久化）
 
 ## 快速开始
@@ -142,26 +153,38 @@ localStorage.setItem('startpage_config', JSON.stringify({
 }));
 ```
 
-### 2) 聊天配置（Gemini only）
+### 2) 聊天配置（Gemini / OpenAI / Anthropic）
 
 在聊天设置中配置：
 
-- Gemini API URL（默认 `https://generativelanguage.googleapis.com/v1beta`）
+- Provider（Gemini / OpenAI / Anthropic）
+- API URL（默认：
+  - Gemini: `https://generativelanguage.googleapis.com/v1beta`
+  - OpenAI: `https://api.openai.com/v1`
+  - Anthropic: `https://api.anthropic.com/v1`
+    ）
 - 主/备 API Key
-- 模型名（如 `gemini-2.5-pro`）
+- 模型名（例如 `gemini-2.5-pro` / `gpt-4o-mini` / `claude-sonnet-4-5-20250929`）
 - System Prompt
-- Thinking Budget（可选）
-- Web Search（可选，Gemini Google Search）
+- Thinking（可选）：
+  - Gemini / Anthropic：正整数预算
+  - OpenAI：`none|minimal|low|medium|high|xhigh`
+- Web Search（可选）：
+  - Gemini：`gemini_google_search`
+  - Anthropic：`anthropic_web_search`
+  - OpenAI：`openai_web_search_low|medium|high`
 - Experience（伪流式开关、草稿自动保存开关）
 - Message Prefix（时间戳、用户名前缀）
 
+说明：配置按 Provider 独立保存；切换 Provider 会自动回填对应配置。OpenAI 的 Reasoning Effort 在切换后可持续保留。
+
 ## 聊天行为要点
 
-- 仅支持 Gemini Provider（内部接口已预留扩展）
+- 支持 Gemini / OpenAI / Anthropic Provider（统一走 provider router）
 - 会话历史使用 `llm_chat_history_v2`（schema version = 2）
 - 草稿按会话保存到 `llm_chat_drafts_v1`
-- 助手输出包含 `<|CHANGE_ROLE|>` 时会拆分为多段消息
-- 开启伪流式时：先拿到完整响应，再前端逐段渲染
+- 开启伪流式时支持实时分段：检测 `<|CHANGE_ROLE|>` 与 `<|END_SENTENCE|>` 标记即落地段落
+- 关闭伪流式时不按标记拆分（标记按普通文本处理）
 - 点击 Stop：请求中会 Abort；伪流式中会停止渲染并保留已输出内容
 - 请求失败时显示错误气泡，支持“回填输入框”
 - 点击用户消息重试按钮会按 `turnId` 回退该轮及其后续消息
