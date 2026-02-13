@@ -16,6 +16,7 @@ import { createSessionStore } from './chat/state/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
 import { createGeminiProvider } from './chat/providers/gemini-provider.js';
 import { createOpenAiProvider } from './chat/providers/openai-provider.js';
+import { createAnthropicProvider } from './chat/providers/anthropic-provider.js';
 import { createProviderRouter } from './chat/providers/provider-router.js';
 import { createDraftManager } from './chat/storage/draft-storage.js';
 
@@ -71,23 +72,38 @@ function setupInputAutosize(chatInput) {
 
 function syncProviderPresentation(elements, providerId) {
     const isOpenAi = providerId === CHAT_PROVIDER_IDS.openai;
+    const isAnthropic = providerId === CHAT_PROVIDER_IDS.anthropic;
 
     if (elements.cfgUrl) {
         elements.cfgUrl.placeholder = isOpenAi
             ? 'https://api.openai.com/v1'
-            : 'https://generativelanguage.googleapis.com/v1beta';
+            : isAnthropic
+                ? 'https://api.anthropic.com/v1'
+                : 'https://generativelanguage.googleapis.com/v1beta';
     }
 
     if (elements.cfgKey) {
-        elements.cfgKey.placeholder = isOpenAi ? 'sk-...' : 'AIza...';
+        elements.cfgKey.placeholder = isOpenAi
+            ? 'sk-...'
+            : isAnthropic
+                ? 'sk-ant-...'
+                : 'AIza...';
     }
 
     if (elements.cfgBackupKey) {
-        elements.cfgBackupKey.placeholder = isOpenAi ? 'sk-...' : 'AIza...';
+        elements.cfgBackupKey.placeholder = isOpenAi
+            ? 'sk-...'
+            : isAnthropic
+                ? 'sk-ant-...'
+                : 'AIza...';
     }
 
     if (elements.cfgModel) {
-        elements.cfgModel.placeholder = isOpenAi ? 'gpt-4o-mini' : 'gemini-2.5-pro';
+        elements.cfgModel.placeholder = isOpenAi
+            ? 'gpt-4o-mini'
+            : isAnthropic
+                ? 'claude-sonnet-4-5-20250929'
+                : 'gemini-2.5-pro';
     }
 
     if (elements.cfgThinkingLabel) {
@@ -99,7 +115,9 @@ function syncProviderPresentation(elements, providerId) {
     if (elements.cfgThinkingNote) {
         elements.cfgThinkingNote.textContent = isOpenAi
             ? 'OpenAI format: none/minimal/low/medium/high/xhigh.'
-            : 'Gemini format: positive integer token budget.';
+            : isAnthropic
+                ? 'Anthropic format: positive integer budget_tokens (recommended >= 1024).'
+                : 'Gemini format: positive integer token budget.';
     }
 
     if (elements.cfgThinkingBudget) {
@@ -113,7 +131,7 @@ function syncProviderPresentation(elements, providerId) {
         } else {
             elements.cfgThinkingBudget.type = 'number';
             elements.cfgThinkingBudget.inputMode = 'numeric';
-            elements.cfgThinkingBudget.min = '1';
+            elements.cfgThinkingBudget.min = isAnthropic ? '1024' : '1';
             elements.cfgThinkingBudget.max = '100000';
             elements.cfgThinkingBudget.step = '256';
             elements.cfgThinkingBudget.placeholder = 'e.g. 2048';
@@ -123,13 +141,17 @@ function syncProviderPresentation(elements, providerId) {
     if (elements.cfgSearchLabel) {
         elements.cfgSearchLabel.textContent = isOpenAi
             ? 'Web Search (OpenAI)'
-            : 'Web Search (Gemini)';
+            : isAnthropic
+                ? 'Web Search (Anthropic)'
+                : 'Web Search (Gemini)';
     }
 
     if (elements.cfgSearchNote) {
         elements.cfgSearchNote.textContent = isOpenAi
             ? 'OpenAI format: web search context size (Low/Medium/High).'
-            : 'Gemini format: Google Search grounding.';
+            : isAnthropic
+                ? 'Anthropic format: built-in web_search tool.'
+                : 'Gemini format: Google Search grounding.';
     }
 }
 
@@ -276,6 +298,9 @@ export function initChat() {
             maxRetries: CHAT_LIMITS.maxRetries
         }),
         createOpenAiProvider({
+            maxRetries: CHAT_LIMITS.maxRetries
+        }),
+        createAnthropicProvider({
             maxRetries: CHAT_LIMITS.maxRetries
         })
     ]);

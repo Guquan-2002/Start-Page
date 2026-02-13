@@ -8,6 +8,7 @@ import { safeGetJson, safeSetJson } from '../shared/safe-storage.js';
 const SUPPORTED_PROVIDER_IDS = Object.values(CHAT_PROVIDER_IDS);
 const OPENAI_REASONING_LEVELS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 const GEMINI_SEARCH_MODES = new Set(['', 'gemini_google_search']);
+const ANTHROPIC_SEARCH_MODES = new Set(['', 'anthropic_web_search']);
 const OPENAI_SEARCH_MODES = new Set([
     '',
     'openai_web_search_low',
@@ -64,6 +65,10 @@ function normalizeSearchMode(provider, rawValue) {
 
     if (provider === CHAT_PROVIDER_IDS.openai) {
         return OPENAI_SEARCH_MODES.has(normalized) ? normalized : '';
+    }
+
+    if (provider === CHAT_PROVIDER_IDS.anthropic) {
+        return ANTHROPIC_SEARCH_MODES.has(normalized) ? normalized : '';
     }
 
     return GEMINI_SEARCH_MODES.has(normalized) ? normalized : '';
@@ -176,6 +181,19 @@ function readSearchInput(provider, searchValue) {
     return normalizeSearchMode(provider, searchValue);
 }
 
+function syncThinkingInputType(field, provider) {
+    if (!field) {
+        return;
+    }
+
+    if (provider === CHAT_PROVIDER_IDS.openai) {
+        field.type = 'text';
+        return;
+    }
+
+    field.type = 'number';
+}
+
 function dispatchChange(element) {
     if (!element || typeof element.dispatchEvent !== 'function' || typeof Event !== 'function') {
         return;
@@ -205,6 +223,8 @@ export function createConfigManager(elements, storageKey) {
     let profiles = createDefaultProfiles();
 
     function readProviderFields(provider) {
+        syncThinkingInputType(cfgThinkingBudget, provider);
+
         return normalizeProviderProfile(provider, {
             apiUrl: cfgUrl.value,
             apiKey: cfgKey.value,
@@ -220,6 +240,7 @@ export function createConfigManager(elements, storageKey) {
         cfgKey.value = profile.apiKey;
         cfgBackupKey.value = profile.backupApiKey;
         cfgModel.value = profile.model;
+        syncThinkingInputType(cfgThinkingBudget, provider);
         cfgThinkingBudget.value = formatThinkingValue(provider, profile.thinkingBudget);
 
         if (cfgSearchMode) {

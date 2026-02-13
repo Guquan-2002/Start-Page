@@ -19,17 +19,48 @@ function createMemoryStorage() {
     };
 }
 
-function createField(initialValue = '') {
+function createField(initialValue = '', {
+    type = 'text',
+    emulateNumberType = false
+} = {}) {
     const listeners = new Map();
+    let fieldType = type;
+    let currentValue = String(initialValue);
+
+    function normalizeValue(nextValue) {
+        const value = String(nextValue ?? '');
+        if (!emulateNumberType || fieldType !== 'number') {
+            return value;
+        }
+
+        if (!value) {
+            return '';
+        }
+
+        return Number.isFinite(Number(value)) ? value : '';
+    }
 
     return {
-        value: initialValue,
+        get value() {
+            return currentValue;
+        },
+        set value(nextValue) {
+            currentValue = normalizeValue(nextValue);
+        },
+        get type() {
+            return fieldType;
+        },
+        set type(nextType) {
+            fieldType = String(nextType || 'text');
+            currentValue = normalizeValue(currentValue);
+        },
         checked: false,
         addEventListener(eventName, handler) {
             const handlers = listeners.get(eventName) || [];
             handlers.push(handler);
             listeners.set(eventName, handlers);
         },
+        removeAttribute() {},
         dispatchEvent(event) {
             const handlers = listeners.get(event?.type) || [];
             handlers.forEach((handler) => handler(event));
@@ -45,7 +76,10 @@ function createElements() {
         cfgBackupKey: createField(''),
         cfgModel: createField(''),
         cfgPrompt: createField(''),
-        cfgThinkingBudget: createField(''),
+        cfgThinkingBudget: createField('', {
+            type: 'number',
+            emulateNumberType: true
+        }),
         cfgSearchMode: createField(''),
         cfgEnablePseudoStream: { checked: true },
         cfgEnableDraftAutosave: { checked: true },
@@ -83,6 +117,18 @@ test('config manager keeps provider specific credentials and models when switchi
     elements.cfgThinkingBudget.value = 'medium';
     elements.cfgSearchMode.value = 'openai_web_search_high';
 
+    elements.cfgProvider.value = 'anthropic';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgUrl.value, 'https://api.anthropic.com/v1');
+    assert.equal(elements.cfgModel.value, 'claude-sonnet-4-5-20250929');
+
+    elements.cfgUrl.value = 'https://api.anthropic.com/v1';
+    elements.cfgKey.value = 'anthropic-key';
+    elements.cfgModel.value = 'claude-sonnet-4-5-20250929';
+    elements.cfgThinkingBudget.value = '2048';
+    elements.cfgSearchMode.value = 'anthropic_web_search';
+
     elements.cfgProvider.value = 'gemini';
     elements.cfgProvider.dispatchEvent(new Event('change'));
 
@@ -99,11 +145,22 @@ test('config manager keeps provider specific credentials and models when switchi
     assert.equal(elements.cfgThinkingBudget.value, 'medium');
     assert.equal(elements.cfgSearchMode.value, 'openai_web_search_high');
 
+    elements.cfgProvider.value = 'anthropic';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgKey.value, 'anthropic-key');
+    assert.equal(elements.cfgModel.value, 'claude-sonnet-4-5-20250929');
+    assert.equal(elements.cfgThinkingBudget.value, '2048');
+    assert.equal(elements.cfgSearchMode.value, 'anthropic_web_search');
+
     manager.saveConfig();
     const saved = JSON.parse(storage.getItem('llm_chat_config'));
-    assert.equal(saved.provider, 'openai');
+    assert.equal(saved.provider, 'anthropic');
     assert.equal(saved.profiles.gemini.model, 'gemini-2.5-pro');
     assert.equal(saved.profiles.openai.model, 'gpt-4o-mini');
     assert.equal(saved.profiles.openai.thinkingBudget, 'medium');
     assert.equal(saved.profiles.openai.searchMode, 'openai_web_search_high');
+    assert.equal(saved.profiles.anthropic.model, 'claude-sonnet-4-5-20250929');
+    assert.equal(saved.profiles.anthropic.thinkingBudget, 2048);
+    assert.equal(saved.profiles.anthropic.searchMode, 'anthropic_web_search');
 });

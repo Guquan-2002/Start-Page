@@ -426,7 +426,12 @@ export function createApiManager({
         }
 
         const config = configManager.getConfig();
-        const providerLabel = config.provider === 'openai' ? 'OpenAI' : 'Gemini';
+        const providerLabelMap = {
+            gemini: 'Gemini',
+            openai: 'OpenAI',
+            anthropic: 'Anthropic'
+        };
+        const providerLabel = providerLabelMap[config.provider] || 'provider';
 
         if (!config.apiKey && !config.backupApiKey) {
             ui.addMessage('error', `Please set at least one ${providerLabel} API key in settings.`);

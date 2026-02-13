@@ -86,6 +86,7 @@
                         <select id="cfg-provider">
                             <option value="gemini">Gemini</option>
                             <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
                         </select>
                     </label>
 
@@ -119,11 +120,12 @@
                         <select id="cfg-search-mode">
                             <option value="">Disabled</option>
                             <option value="gemini_google_search">Gemini Google Search</option>
+                            <option value="anthropic_web_search">Anthropic Web Search</option>
                             <option value="openai_web_search_low">OpenAI Web Search (Low)</option>
                             <option value="openai_web_search_medium">OpenAI Web Search (Medium)</option>
                             <option value="openai_web_search_high">OpenAI Web Search (High)</option>
                         </select>
-                        <small id="cfg-search-note" class="chat-settings-note">Gemini uses Google Search grounding; OpenAI uses web search context size.</small>
+                        <small id="cfg-search-note" class="chat-settings-note">Gemini uses Google Search grounding; Anthropic uses web_search; OpenAI uses web search context size.</small>
                     </label>
 
                     <div class="chat-settings-section">
