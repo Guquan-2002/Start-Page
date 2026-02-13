@@ -75,14 +75,21 @@
             <div class="chat-settings-overlay">
                 <div class="chat-settings-header">
                     <div class="chat-settings-title-group">
-                        <span class="chat-settings-title">Gemini Settings</span>
-                        <small class="chat-settings-subtitle">Configure Gemini API URL, keys, model, prompt, and optional features.</small>
+                        <span class="chat-settings-title">AI Settings</span>
+                        <small class="chat-settings-subtitle">Configure provider, API URL, keys, model, prompt, and optional features.</small>
                     </div>
                     <button id="cfg-close-btn" title="Close settings"><i class="fas fa-times"></i></button>
                 </div>
 
                 <div class="chat-settings-content">
-                    <label>Gemini API URL
+                    <label>Provider
+                        <select id="cfg-provider">
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </label>
+
+                    <label>API URL
                         <input type="text" id="cfg-api-url" placeholder="https://generativelanguage.googleapis.com/v1beta" spellcheck="false">
                     </label>
 
@@ -95,7 +102,7 @@
                         </label>
                     </div>
 
-                    <label>Gemini Model
+                    <label>Model
                         <input type="text" id="cfg-model" placeholder="gemini-2.5-pro" spellcheck="false">
                     </label>
 
@@ -103,17 +110,20 @@
                         <textarea id="cfg-system-prompt" rows="3" placeholder="You are a helpful assistant."></textarea>
                     </label>
 
-                    <label>Thinking Budget (Optional)
+                    <label><span id="cfg-thinking-label">Thinking Budget (Optional)</span>
                         <input type="number" id="cfg-thinking-budget" placeholder="e.g. 2048" min="1" max="100000" step="256" spellcheck="false">
-                        <small class="chat-settings-note">When set, this value is sent as Gemini thinking budget tokens.</small>
+                        <small id="cfg-thinking-note" class="chat-settings-note">Gemini-only option. Ignored by OpenAI provider.</small>
                     </label>
 
-                    <label>Web Search
+                    <label><span id="cfg-search-label">Web Search</span>
                         <select id="cfg-search-mode">
                             <option value="">Disabled</option>
                             <option value="gemini_google_search">Gemini Google Search</option>
+                            <option value="openai_web_search_low">OpenAI Web Search (Low)</option>
+                            <option value="openai_web_search_medium">OpenAI Web Search (Medium)</option>
+                            <option value="openai_web_search_high">OpenAI Web Search (High)</option>
                         </select>
-                        <small class="chat-settings-note">Enable grounding with Gemini Google Search.</small>
+                        <small id="cfg-search-note" class="chat-settings-note">Gemini uses Google Search grounding; OpenAI uses web search context size.</small>
                     </label>
 
                     <div class="chat-settings-section">

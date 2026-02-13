@@ -394,7 +394,7 @@ export function createApiManager({
                 loadingMessage.remove();
 
                 if (abortReason === 'connect_timeout') {
-                    showFailureMessage('Connection timeout', 'Check network status and Gemini API URL.', failedInputText);
+                    showFailureMessage('Connection timeout', 'Check network status and API URL.', failedInputText);
                 } else if (abortReason === 'user') {
                     if (shouldUseStreaming) {
                         streamState.splitter?.discardRemainder();
@@ -426,21 +426,16 @@ export function createApiManager({
         }
 
         const config = configManager.getConfig();
+        const providerLabel = config.provider === 'openai' ? 'OpenAI' : 'Gemini';
 
         if (!config.apiKey && !config.backupApiKey) {
-            ui.addMessage('error', 'Please set at least one Gemini API key in settings.');
+            ui.addMessage('error', `Please set at least one ${providerLabel} API key in settings.`);
             settingsDiv.classList.remove('chat-settings-hidden');
             return;
         }
 
         if (!config.model) {
-            ui.addMessage('error', 'Please set a Gemini model name in settings.');
-            settingsDiv.classList.remove('chat-settings-hidden');
-            return;
-        }
-
-        if (config.provider !== 'gemini') {
-            ui.addMessage('error', 'Only Gemini provider is currently supported.');
+            ui.addMessage('error', `Please set a ${providerLabel} model name in settings.`);
             settingsDiv.classList.remove('chat-settings-hidden');
             return;
         }

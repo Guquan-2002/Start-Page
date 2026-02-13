@@ -1,5 +1,11 @@
 ﻿import { $ } from './utils.js';
-import { CHAT_DRAFTS_KEY, CHAT_HISTORY_KEY, CHAT_LIMITS, CHAT_STORAGE_KEY } from './chat/constants.js';
+import {
+    CHAT_DRAFTS_KEY,
+    CHAT_HISTORY_KEY,
+    CHAT_LIMITS,
+    CHAT_STORAGE_KEY,
+    CHAT_PROVIDER_IDS
+} from './chat/constants.js';
 import { createConfigManager } from './chat/config.js';
 import { setupMarked, renderMarkdown } from './chat/markdown.js';
 import { createUiManager } from './chat/ui.js';
@@ -9,6 +15,8 @@ import { initCustomSelect } from './chat/custom-select.js';
 import { createSessionStore } from './chat/state/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
 import { createGeminiProvider } from './chat/providers/gemini-provider.js';
+import { createOpenAiProvider } from './chat/providers/openai-provider.js';
+import { createProviderRouter } from './chat/providers/provider-router.js';
 import { createDraftManager } from './chat/storage/draft-storage.js';
 
 function getChatElements() {
@@ -30,13 +38,18 @@ function getChatElements() {
         chatInput: $('#chat-input'),
         sendBtn: $('#chat-send-btn'),
         stopBtn: $('#chat-stop-btn'),
+        cfgProvider: $('#cfg-provider'),
         cfgUrl: $('#cfg-api-url'),
         cfgKey: $('#cfg-api-key'),
         cfgBackupKey: $('#cfg-api-key-backup'),
         cfgModel: $('#cfg-model'),
         cfgPrompt: $('#cfg-system-prompt'),
         cfgThinkingBudget: $('#cfg-thinking-budget'),
+        cfgThinkingLabel: $('#cfg-thinking-label'),
+        cfgThinkingNote: $('#cfg-thinking-note'),
         cfgSearchMode: $('#cfg-search-mode'),
+        cfgSearchLabel: $('#cfg-search-label'),
+        cfgSearchNote: $('#cfg-search-note'),
         cfgEnablePseudoStream: $('#cfg-enable-pseudo-stream'),
         cfgEnableDraftAutosave: $('#cfg-enable-draft-autosave'),
         cfgPrefixWithTime: $('#cfg-prefix-with-time'),
@@ -56,6 +69,70 @@ function setupInputAutosize(chatInput) {
     });
 }
 
+function syncProviderPresentation(elements, providerId) {
+    const isOpenAi = providerId === CHAT_PROVIDER_IDS.openai;
+
+    if (elements.cfgUrl) {
+        elements.cfgUrl.placeholder = isOpenAi
+            ? 'https://api.openai.com/v1'
+            : 'https://generativelanguage.googleapis.com/v1beta';
+    }
+
+    if (elements.cfgKey) {
+        elements.cfgKey.placeholder = isOpenAi ? 'sk-...' : 'AIza...';
+    }
+
+    if (elements.cfgBackupKey) {
+        elements.cfgBackupKey.placeholder = isOpenAi ? 'sk-...' : 'AIza...';
+    }
+
+    if (elements.cfgModel) {
+        elements.cfgModel.placeholder = isOpenAi ? 'gpt-4o-mini' : 'gemini-2.5-pro';
+    }
+
+    if (elements.cfgThinkingLabel) {
+        elements.cfgThinkingLabel.textContent = isOpenAi
+            ? 'Reasoning Effort (Optional)'
+            : 'Thinking Budget (Optional)';
+    }
+
+    if (elements.cfgThinkingNote) {
+        elements.cfgThinkingNote.textContent = isOpenAi
+            ? 'OpenAI format: none/minimal/low/medium/high/xhigh.'
+            : 'Gemini format: positive integer token budget.';
+    }
+
+    if (elements.cfgThinkingBudget) {
+        if (isOpenAi) {
+            elements.cfgThinkingBudget.type = 'text';
+            elements.cfgThinkingBudget.inputMode = 'text';
+            elements.cfgThinkingBudget.removeAttribute('min');
+            elements.cfgThinkingBudget.removeAttribute('max');
+            elements.cfgThinkingBudget.removeAttribute('step');
+            elements.cfgThinkingBudget.placeholder = 'medium';
+        } else {
+            elements.cfgThinkingBudget.type = 'number';
+            elements.cfgThinkingBudget.inputMode = 'numeric';
+            elements.cfgThinkingBudget.min = '1';
+            elements.cfgThinkingBudget.max = '100000';
+            elements.cfgThinkingBudget.step = '256';
+            elements.cfgThinkingBudget.placeholder = 'e.g. 2048';
+        }
+    }
+
+    if (elements.cfgSearchLabel) {
+        elements.cfgSearchLabel.textContent = isOpenAi
+            ? 'Web Search (OpenAI)'
+            : 'Web Search (Gemini)';
+    }
+
+    if (elements.cfgSearchNote) {
+        elements.cfgSearchNote.textContent = isOpenAi
+            ? 'OpenAI format: web search context size (Low/Medium/High).'
+            : 'Gemini format: Google Search grounding.';
+    }
+}
+
 export function initChat() {
     const elements = getChatElements();
     const store = createSessionStore({
@@ -68,6 +145,7 @@ export function initChat() {
     });
 
     const configManager = createConfigManager({
+        cfgProvider: elements.cfgProvider,
         cfgUrl: elements.cfgUrl,
         cfgKey: elements.cfgKey,
         cfgBackupKey: elements.cfgBackupKey,
@@ -193,9 +271,14 @@ export function initChat() {
         onBlockedSessionOperation: notifySessionBusy
     });
 
-    const provider = createGeminiProvider({
-        maxRetries: CHAT_LIMITS.maxRetries
-    });
+    const provider = createProviderRouter([
+        createGeminiProvider({
+            maxRetries: CHAT_LIMITS.maxRetries
+        }),
+        createOpenAiProvider({
+            maxRetries: CHAT_LIMITS.maxRetries
+        })
+    ]);
 
     const apiManager = createApiManager({
         store,
@@ -223,6 +306,11 @@ export function initChat() {
     const openSettings = () => {
         elements.settingsDiv.classList.remove('chat-settings-hidden');
         elements.historyDiv.classList.add('chat-history-hidden');
+        if (elements.cfgProvider) {
+            elements.cfgProvider.focus();
+            return;
+        }
+
         elements.cfgUrl.focus();
     };
 
@@ -341,6 +429,16 @@ export function initChat() {
     });
 
     configManager.loadConfig();
+    if (elements.cfgProvider) {
+        syncProviderPresentation(elements, elements.cfgProvider.value || CHAT_PROVIDER_IDS.gemini);
+
+        elements.cfgProvider.addEventListener('change', () => {
+            const providerId = elements.cfgProvider.value || CHAT_PROVIDER_IDS.gemini;
+            syncProviderPresentation(elements, providerId);
+        });
+    }
+
+    initCustomSelect(elements.cfgProvider);
     initCustomSelect(elements.cfgSearchMode);
 
     store.initialize();

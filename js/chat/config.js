@@ -1,5 +1,19 @@
-﻿import { GEMINI_DEFAULTS } from './constants.js';
+﻿import {
+    CHAT_DEFAULTS,
+    CHAT_PROVIDER_IDS,
+    getProviderDefaults
+} from './constants.js';
 import { safeGetJson, safeSetJson } from '../shared/safe-storage.js';
+
+const SUPPORTED_PROVIDER_IDS = Object.values(CHAT_PROVIDER_IDS);
+const OPENAI_REASONING_LEVELS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+const GEMINI_SEARCH_MODES = new Set(['', 'gemini_google_search']);
+const OPENAI_SEARCH_MODES = new Set([
+    '',
+    'openai_web_search_low',
+    'openai_web_search_medium',
+    'openai_web_search_high'
+]);
 
 function parsePositiveInteger(rawValue) {
     const parsed = Number.parseInt(rawValue, 10);
@@ -27,26 +41,152 @@ function normalizeNameField(rawValue, fallback) {
     return rawValue.trim();
 }
 
-function normalizeStoredConfig(raw) {
+function normalizeProvider(rawValue) {
+    const provider = typeof rawValue === 'string' ? rawValue.trim().toLowerCase() : '';
+    if (SUPPORTED_PROVIDER_IDS.includes(provider)) {
+        return provider;
+    }
+
+    return CHAT_DEFAULTS.provider;
+}
+
+function normalizeThinkingValue(provider, rawValue) {
+    if (provider === CHAT_PROVIDER_IDS.openai) {
+        const normalized = typeof rawValue === 'string' ? rawValue.trim().toLowerCase() : '';
+        return OPENAI_REASONING_LEVELS.has(normalized) ? normalized : null;
+    }
+
+    return parsePositiveInteger(rawValue);
+}
+
+function normalizeSearchMode(provider, rawValue) {
+    const normalized = typeof rawValue === 'string' ? rawValue.trim() : '';
+
+    if (provider === CHAT_PROVIDER_IDS.openai) {
+        return OPENAI_SEARCH_MODES.has(normalized) ? normalized : '';
+    }
+
+    return GEMINI_SEARCH_MODES.has(normalized) ? normalized : '';
+}
+
+function normalizeProviderProfile(provider, rawProfile = {}, fallbackProfile = null) {
+    const defaults = getProviderDefaults(provider);
+    const fallback = fallbackProfile || defaults;
+
     return {
-        provider: GEMINI_DEFAULTS.provider,
-        apiUrl: typeof raw.apiUrl === 'string' && raw.apiUrl.trim() ? raw.apiUrl.trim() : GEMINI_DEFAULTS.apiUrl,
-        apiKey: typeof raw.apiKey === 'string' ? raw.apiKey.trim() : '',
-        backupApiKey: typeof raw.backupApiKey === 'string' ? raw.backupApiKey.trim() : '',
-        model: typeof raw.model === 'string' ? raw.model.trim() : '',
-        systemPrompt: typeof raw.systemPrompt === 'string' ? raw.systemPrompt : GEMINI_DEFAULTS.systemPrompt,
-        thinkingBudget: parsePositiveInteger(raw.thinkingBudget),
-        searchMode: typeof raw.searchMode === 'string' ? raw.searchMode : GEMINI_DEFAULTS.searchMode,
-        enablePseudoStream: parseBoolean(raw.enablePseudoStream, GEMINI_DEFAULTS.enablePseudoStream),
-        enableDraftAutosave: parseBoolean(raw.enableDraftAutosave, GEMINI_DEFAULTS.enableDraftAutosave),
-        prefixWithTime: parseBoolean(raw.prefixWithTime, GEMINI_DEFAULTS.prefixWithTime),
-        prefixWithName: parseBoolean(raw.prefixWithName, GEMINI_DEFAULTS.prefixWithName),
-        userName: normalizeNameField(raw.userName, GEMINI_DEFAULTS.userName)
+        apiUrl: typeof rawProfile.apiUrl === 'string' && rawProfile.apiUrl.trim()
+            ? rawProfile.apiUrl.trim()
+            : fallback.apiUrl,
+        apiKey: typeof rawProfile.apiKey === 'string' ? rawProfile.apiKey.trim() : (fallback.apiKey || ''),
+        backupApiKey: typeof rawProfile.backupApiKey === 'string' ? rawProfile.backupApiKey.trim() : (fallback.backupApiKey || ''),
+        model: typeof rawProfile.model === 'string' ? rawProfile.model.trim() : (fallback.model || ''),
+        thinkingBudget: normalizeThinkingValue(provider, rawProfile.thinkingBudget),
+        searchMode: normalizeSearchMode(provider, rawProfile.searchMode)
     };
+}
+
+function createDefaultProfiles() {
+    return Object.fromEntries(
+        SUPPORTED_PROVIDER_IDS.map((providerId) => [
+            providerId,
+            normalizeProviderProfile(providerId, getProviderDefaults(providerId))
+        ])
+    );
+}
+
+function cloneProfiles(profiles) {
+    return Object.fromEntries(
+        Object.entries(profiles).map(([providerId, profile]) => [providerId, { ...profile }])
+    );
+}
+
+function readRawProfiles(raw) {
+    if (raw && typeof raw.profiles === 'object' && raw.profiles) {
+        return raw.profiles;
+    }
+
+    if (raw && typeof raw.providerProfiles === 'object' && raw.providerProfiles) {
+        return raw.providerProfiles;
+    }
+
+    return {};
+}
+
+function normalizeStoredConfig(raw) {
+    const provider = normalizeProvider(raw?.provider);
+    const rawProfiles = readRawProfiles(raw);
+
+    const legacySource = {
+        apiUrl: raw?.apiUrl,
+        apiKey: raw?.apiKey,
+        backupApiKey: raw?.backupApiKey,
+        model: raw?.model,
+        thinkingBudget: raw?.thinkingBudget,
+        searchMode: raw?.searchMode
+    };
+
+    const defaultProfiles = createDefaultProfiles();
+    const profiles = {};
+
+    SUPPORTED_PROVIDER_IDS.forEach((providerId) => {
+        const rawProfile = rawProfiles?.[providerId] && typeof rawProfiles[providerId] === 'object'
+            ? rawProfiles[providerId]
+            : {};
+
+        const source = providerId === provider
+            ? { ...legacySource, ...rawProfile }
+            : rawProfile;
+
+        profiles[providerId] = normalizeProviderProfile(providerId, source, defaultProfiles[providerId]);
+    });
+
+    const activeProfile = profiles[provider];
+
+    return {
+        provider,
+        profiles,
+        apiUrl: activeProfile.apiUrl,
+        apiKey: activeProfile.apiKey,
+        backupApiKey: activeProfile.backupApiKey,
+        model: activeProfile.model,
+        thinkingBudget: activeProfile.thinkingBudget,
+        searchMode: activeProfile.searchMode,
+        systemPrompt: typeof raw?.systemPrompt === 'string' ? raw.systemPrompt : CHAT_DEFAULTS.systemPrompt,
+        enablePseudoStream: parseBoolean(raw?.enablePseudoStream, CHAT_DEFAULTS.enablePseudoStream),
+        enableDraftAutosave: parseBoolean(raw?.enableDraftAutosave, CHAT_DEFAULTS.enableDraftAutosave),
+        prefixWithTime: parseBoolean(raw?.prefixWithTime, CHAT_DEFAULTS.prefixWithTime),
+        prefixWithName: parseBoolean(raw?.prefixWithName, CHAT_DEFAULTS.prefixWithName),
+        userName: normalizeNameField(raw?.userName, CHAT_DEFAULTS.userName)
+    };
+}
+
+function formatThinkingValue(provider, thinkingValue) {
+    if (provider === CHAT_PROVIDER_IDS.openai) {
+        return typeof thinkingValue === 'string' ? thinkingValue : '';
+    }
+
+    return Number.isFinite(thinkingValue) && thinkingValue > 0 ? String(thinkingValue) : '';
+}
+
+function parseThinkingInput(provider, rawValue) {
+    return normalizeThinkingValue(provider, rawValue);
+}
+
+function readSearchInput(provider, searchValue) {
+    return normalizeSearchMode(provider, searchValue);
+}
+
+function dispatchChange(element) {
+    if (!element || typeof element.dispatchEvent !== 'function' || typeof Event !== 'function') {
+        return;
+    }
+
+    element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
 export function createConfigManager(elements, storageKey) {
     const {
+        cfgProvider,
         cfgUrl,
         cfgKey,
         cfgBackupKey,
@@ -61,13 +201,56 @@ export function createConfigManager(elements, storageKey) {
         cfgUserName
     } = elements;
 
+    let activeProvider = CHAT_DEFAULTS.provider;
+    let profiles = createDefaultProfiles();
+
+    function readProviderFields(provider) {
+        return normalizeProviderProfile(provider, {
+            apiUrl: cfgUrl.value,
+            apiKey: cfgKey.value,
+            backupApiKey: cfgBackupKey.value,
+            model: cfgModel.value,
+            thinkingBudget: parseThinkingInput(provider, cfgThinkingBudget.value),
+            searchMode: readSearchInput(provider, cfgSearchMode ? cfgSearchMode.value : '')
+        }, profiles[provider]);
+    }
+
+    function applyProviderProfile(provider, profile, { dispatchSearchChange = true } = {}) {
+        cfgUrl.value = profile.apiUrl;
+        cfgKey.value = profile.apiKey;
+        cfgBackupKey.value = profile.backupApiKey;
+        cfgModel.value = profile.model;
+        cfgThinkingBudget.value = formatThinkingValue(provider, profile.thinkingBudget);
+
+        if (cfgSearchMode) {
+            cfgSearchMode.value = profile.searchMode;
+            if (dispatchSearchChange) {
+                dispatchChange(cfgSearchMode);
+            }
+        }
+    }
+
+    function switchProvider(nextProviderRaw, { dispatchSearchChange = true } = {}) {
+        const nextProvider = normalizeProvider(nextProviderRaw);
+        if (nextProvider === activeProvider) {
+            return;
+        }
+
+        profiles[activeProvider] = readProviderFields(activeProvider);
+        activeProvider = nextProvider;
+        applyProviderProfile(activeProvider, profiles[activeProvider], { dispatchSearchChange });
+    }
+
     function applyConfigToForm(config) {
-        cfgUrl.value = config.apiUrl;
-        cfgKey.value = config.apiKey;
-        cfgBackupKey.value = config.backupApiKey;
-        cfgModel.value = config.model;
+        profiles = cloneProfiles(config.profiles);
+        activeProvider = config.provider;
+
+        if (cfgProvider) {
+            cfgProvider.value = config.provider;
+        }
+
+        applyProviderProfile(activeProvider, profiles[activeProvider], { dispatchSearchChange: false });
         cfgPrompt.value = config.systemPrompt;
-        cfgThinkingBudget.value = config.thinkingBudget ?? '';
 
         if (cfgEnablePseudoStream) {
             cfgEnablePseudoStream.checked = config.enablePseudoStream;
@@ -82,45 +265,61 @@ export function createConfigManager(elements, storageKey) {
         cfgUserName.value = config.userName;
 
         if (cfgSearchMode) {
-            cfgSearchMode.value = config.searchMode;
+            dispatchChange(cfgSearchMode);
         }
     }
 
     function readConfigFromForm() {
-        return normalizeStoredConfig({
-            provider: GEMINI_DEFAULTS.provider,
-            apiUrl: cfgUrl.value,
-            apiKey: cfgKey.value,
-            backupApiKey: cfgBackupKey.value,
-            model: cfgModel.value,
+        const selectedProvider = cfgProvider ? normalizeProvider(cfgProvider.value) : activeProvider;
+        if (selectedProvider !== activeProvider) {
+            switchProvider(selectedProvider);
+        }
+
+        profiles[activeProvider] = readProviderFields(activeProvider);
+        const activeProfile = profiles[activeProvider];
+
+        return {
+            provider: activeProvider,
+            profiles: cloneProfiles(profiles),
+            apiUrl: activeProfile.apiUrl,
+            apiKey: activeProfile.apiKey,
+            backupApiKey: activeProfile.backupApiKey,
+            model: activeProfile.model,
+            thinkingBudget: activeProfile.thinkingBudget,
+            searchMode: activeProfile.searchMode,
             systemPrompt: cfgPrompt.value,
-            thinkingBudget: cfgThinkingBudget.value,
-            searchMode: cfgSearchMode ? cfgSearchMode.value : GEMINI_DEFAULTS.searchMode,
-            enablePseudoStream: cfgEnablePseudoStream ? cfgEnablePseudoStream.checked : GEMINI_DEFAULTS.enablePseudoStream,
-            enableDraftAutosave: cfgEnableDraftAutosave ? cfgEnableDraftAutosave.checked : GEMINI_DEFAULTS.enableDraftAutosave,
+            enablePseudoStream: cfgEnablePseudoStream ? cfgEnablePseudoStream.checked : CHAT_DEFAULTS.enablePseudoStream,
+            enableDraftAutosave: cfgEnableDraftAutosave ? cfgEnableDraftAutosave.checked : CHAT_DEFAULTS.enableDraftAutosave,
             prefixWithTime: cfgPrefixWithTime.checked,
             prefixWithName: cfgPrefixWithName.checked,
             userName: cfgUserName.value
-        });
+        };
     }
 
     function loadConfig() {
-        applyConfigToForm(normalizeStoredConfig(
+        const config = normalizeStoredConfig(
             safeGetJson(storageKey, {}, globalThis.localStorage)
-        ));
+        );
+        applyConfigToForm(config);
     }
 
     function saveConfig() {
-        const config = readConfigFromForm();
+        const config = normalizeStoredConfig(readConfigFromForm());
         safeSetJson(storageKey, config, globalThis.localStorage);
     }
 
     function getConfig() {
-        const config = readConfigFromForm();
+        const config = normalizeStoredConfig(readConfigFromForm());
         return {
             ...config,
-            systemPrompt: config.systemPrompt || GEMINI_DEFAULTS.systemPrompt
+            systemPrompt: config.systemPrompt || CHAT_DEFAULTS.systemPrompt
         };
+    }
+
+    if (cfgProvider && typeof cfgProvider.addEventListener === 'function') {
+        cfgProvider.addEventListener('change', () => {
+            switchProvider(cfgProvider.value);
+        });
     }
 
     return {
