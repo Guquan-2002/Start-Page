@@ -148,7 +148,12 @@ function parseOpenAiResponseText(responseData) {
  * @returns {string} 文本增量
  */
 function parseOpenAiResponseStreamDelta(responseData) {
-    if (typeof responseData?.delta === 'string' && responseData.delta) {
+    // 仅消费输出文本增量，避免将工具参数等非文本 delta 串到聊天内容中。
+    if (
+        responseData?.type === 'response.output_text.delta'
+        && typeof responseData?.delta === 'string'
+        && responseData.delta
+    ) {
         return responseData.delta;
     }
 
@@ -613,7 +618,5 @@ export function createOpenAiResponsesProvider(options = {}) {
         apiMode: OPENAI_API_MODES.responses
     });
 }
-
-
 
 

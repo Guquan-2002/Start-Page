@@ -170,7 +170,7 @@ export function buildOpenAiResponsesRequest({
     if (typeof config?.searchMode === 'string' && config.searchMode.startsWith('openai_web_search_')) {
         const contextSize = config.searchMode.replace('openai_web_search_', '');
         body.tools = [{
-            type: 'web_search_preview',
+            type: 'web_search',
             search_context_size: contextSize
         }];
     }

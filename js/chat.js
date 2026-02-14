@@ -162,7 +162,7 @@ function syncProviderPresentation(elements, providerId) {
     if (elements.cfgSearchNote) {
         elements.cfgSearchNote.textContent = isOpenAi
             ? isOpenAiResponses
-                ? 'OpenAI Responses uses the web_search_preview tool with Low/Medium/High context size.'
+                ? 'OpenAI Responses uses the web_search tool with Low/Medium/High context size.'
                 : 'OpenAI Chat Completions uses web_search_options context size (Low/Medium/High).'
             : isAnthropic
                 ? 'Anthropic format: built-in web_search tool.'
