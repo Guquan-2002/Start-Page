@@ -16,6 +16,11 @@ const OPENAI_SEARCH_MODES = new Set([
     'openai_web_search_high'
 ]);
 
+function isOpenAiProvider(provider) {
+    return provider === CHAT_PROVIDER_IDS.openai
+        || provider === CHAT_PROVIDER_IDS.openaiResponses;
+}
+
 function parsePositiveInteger(rawValue) {
     const parsed = Number.parseInt(rawValue, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
@@ -44,6 +49,11 @@ function normalizeNameField(rawValue, fallback) {
 
 function normalizeProvider(rawValue) {
     const provider = typeof rawValue === 'string' ? rawValue.trim().toLowerCase() : '';
+
+    if (provider === 'openai_chat_completions') {
+        return CHAT_PROVIDER_IDS.openai;
+    }
+
     if (SUPPORTED_PROVIDER_IDS.includes(provider)) {
         return provider;
     }
@@ -52,7 +62,7 @@ function normalizeProvider(rawValue) {
 }
 
 function normalizeThinkingValue(provider, rawValue) {
-    if (provider === CHAT_PROVIDER_IDS.openai) {
+    if (isOpenAiProvider(provider)) {
         const normalized = typeof rawValue === 'string' ? rawValue.trim().toLowerCase() : '';
         return OPENAI_REASONING_LEVELS.has(normalized) ? normalized : null;
     }
@@ -63,7 +73,7 @@ function normalizeThinkingValue(provider, rawValue) {
 function normalizeSearchMode(provider, rawValue) {
     const normalized = typeof rawValue === 'string' ? rawValue.trim() : '';
 
-    if (provider === CHAT_PROVIDER_IDS.openai) {
+    if (isOpenAiProvider(provider)) {
         return OPENAI_SEARCH_MODES.has(normalized) ? normalized : '';
     }
 
@@ -166,7 +176,7 @@ function normalizeStoredConfig(raw) {
 }
 
 function formatThinkingValue(provider, thinkingValue) {
-    if (provider === CHAT_PROVIDER_IDS.openai) {
+    if (isOpenAiProvider(provider)) {
         return typeof thinkingValue === 'string' ? thinkingValue : '';
     }
 
@@ -186,7 +196,7 @@ function syncThinkingInputType(field, provider) {
         return;
     }
 
-    if (provider === CHAT_PROVIDER_IDS.openai) {
+    if (isOpenAiProvider(provider)) {
         field.type = 'text';
         return;
     }

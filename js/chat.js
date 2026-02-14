@@ -15,7 +15,10 @@ import { initCustomSelect } from './chat/custom-select.js';
 import { createSessionStore } from './chat/state/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
 import { createGeminiProvider } from './chat/providers/gemini-provider.js';
-import { createOpenAiProvider } from './chat/providers/openai-provider.js';
+import {
+    createOpenAiProvider,
+    createOpenAiResponsesProvider
+} from './chat/providers/openai-provider.js';
 import { createAnthropicProvider } from './chat/providers/anthropic-provider.js';
 import { createProviderRouter } from './chat/providers/provider-router.js';
 import { createDraftManager } from './chat/storage/draft-storage.js';
@@ -71,7 +74,9 @@ function setupInputAutosize(chatInput) {
 }
 
 function syncProviderPresentation(elements, providerId) {
-    const isOpenAi = providerId === CHAT_PROVIDER_IDS.openai;
+    const isOpenAiCompletions = providerId === CHAT_PROVIDER_IDS.openai;
+    const isOpenAiResponses = providerId === CHAT_PROVIDER_IDS.openaiResponses;
+    const isOpenAi = isOpenAiCompletions || isOpenAiResponses;
     const isAnthropic = providerId === CHAT_PROVIDER_IDS.anthropic;
 
     if (elements.cfgUrl) {
@@ -114,7 +119,9 @@ function syncProviderPresentation(elements, providerId) {
 
     if (elements.cfgThinkingNote) {
         elements.cfgThinkingNote.textContent = isOpenAi
-            ? 'OpenAI format: none/minimal/low/medium/high/xhigh.'
+            ? isOpenAiResponses
+                ? 'OpenAI Responses: reasoning.effort supports none/minimal/low/medium/high/xhigh.'
+                : 'OpenAI Chat Completions: reasoning_effort supports none/minimal/low/medium/high/xhigh.'
             : isAnthropic
                 ? 'Anthropic format: positive integer budget_tokens (recommended >= 1024).'
                 : 'Gemini format: positive integer token budget.';
@@ -140,7 +147,9 @@ function syncProviderPresentation(elements, providerId) {
 
     if (elements.cfgSearchLabel) {
         elements.cfgSearchLabel.textContent = isOpenAi
-            ? 'Web Search (OpenAI)'
+            ? isOpenAiResponses
+                ? 'Web Search (OpenAI Responses)'
+                : 'Web Search (OpenAI Completions)'
             : isAnthropic
                 ? 'Web Search (Anthropic)'
                 : 'Web Search (Gemini)';
@@ -148,7 +157,9 @@ function syncProviderPresentation(elements, providerId) {
 
     if (elements.cfgSearchNote) {
         elements.cfgSearchNote.textContent = isOpenAi
-            ? 'OpenAI format: web search context size (Low/Medium/High).'
+            ? isOpenAiResponses
+                ? 'OpenAI Responses uses the web_search_preview tool with Low/Medium/High context size.'
+                : 'OpenAI Chat Completions uses web_search_options context size (Low/Medium/High).'
             : isAnthropic
                 ? 'Anthropic format: built-in web_search tool.'
                 : 'Gemini format: Google Search grounding.';
@@ -298,6 +309,9 @@ export function initChat() {
             maxRetries: CHAT_LIMITS.maxRetries
         }),
         createOpenAiProvider({
+            maxRetries: CHAT_LIMITS.maxRetries
+        }),
+        createOpenAiResponsesProvider({
             maxRetries: CHAT_LIMITS.maxRetries
         }),
         createAnthropicProvider({

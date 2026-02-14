@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createOpenAiProvider } from '../../js/chat/providers/openai-provider.js';
+import {
+    createOpenAiProvider,
+    createOpenAiResponsesProvider
+} from '../../js/chat/providers/openai-provider.js';
 import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../../js/chat/constants.js';
 
 function createOpenAiConfig(overrides = {}) {
@@ -211,4 +214,113 @@ test('openai provider stream does not switch to backup key after first delta', a
     );
 
     assert.deepEqual(apiKeys, ['primary-key']);
+});
+
+test('openai chat completions provider targets chat/completions endpoint', async () => {
+    let requestUrl = '';
+    const fetchMock = async (url) => {
+        requestUrl = url;
+        return new Response(JSON.stringify({
+            choices: [{ message: { content: 'ok' } }]
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    };
+
+    const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
+    await provider.generate({
+        config: createOpenAiConfig({ backupApiKey: '' }),
+        contextMessages,
+        signal: new AbortController().signal
+    });
+
+    assert.equal(requestUrl, 'https://api.openai.com/v1/chat/completions');
+});
+
+test('openai provider supports responses API for non-stream requests', async () => {
+    let requestUrl = '';
+    let requestBody = null;
+    const fetchMock = async (url, options) => {
+        requestUrl = url;
+        requestBody = JSON.parse(options.body);
+
+        return new Response(JSON.stringify({
+            output: [{
+                content: [{
+                    type: 'output_text',
+                    text: 'responses ok'
+                }]
+            }]
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    };
+
+    const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
+    const result = await provider.generate({
+        config: createOpenAiConfig({ backupApiKey: '' }),
+        contextMessages,
+        signal: new AbortController().signal
+    });
+
+    assert.equal(requestUrl, 'https://api.openai.com/v1/responses');
+    assert.deepEqual(requestBody.input, [{ role: 'user', content: 'hello' }]);
+    assert.equal(requestBody.instructions.includes('You are a helpful assistant.'), true);
+    assert.deepEqual(result.segments, ['responses ok']);
+});
+
+test('openai provider supports responses API streaming deltas', async () => {
+    const encoder = new TextEncoder();
+    const streamBody = new ReadableStream({
+        start(controller) {
+            controller.enqueue(encoder.encode(
+                toSseEvent({ type: 'response.output_text.delta', delta: 'Hello ' })
+                + toSseEvent({ type: 'response.output_text.delta', delta: 'responses' })
+                + toDoneEvent()
+            ));
+            controller.close();
+        }
+    });
+
+    const fetchMock = async (url) => {
+        assert.equal(url, 'https://api.openai.com/v1/responses');
+        return new Response(streamBody, {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' }
+        });
+    };
+
+    const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
+    const deltas = await collectDeltas(provider.generateStream({
+        config: createOpenAiConfig({ backupApiKey: '' }),
+        contextMessages,
+        signal: new AbortController().signal
+    }));
+
+    assert.equal(deltas.join(''), 'Hello responses');
+});
+
+test('openai responses provider appends responses path by default', async () => {
+    let requestUrl = '';
+    const fetchMock = async (url) => {
+        requestUrl = url;
+        return new Response(JSON.stringify({
+            output_text: 'auto endpoint'
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    };
+
+    const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
+    const result = await provider.generate({
+        config: createOpenAiConfig({ backupApiKey: '' }),
+        contextMessages,
+        signal: new AbortController().signal
+    });
+
+    assert.equal(requestUrl, 'https://api.openai.com/v1/responses');
+    assert.deepEqual(result.segments, ['auto endpoint']);
 });

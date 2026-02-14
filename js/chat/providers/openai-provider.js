@@ -1,5 +1,14 @@
 import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../constants.js';
+import {
+    ASSISTANT_SEGMENT_MARKER,
+    ASSISTANT_SENTENCE_MARKER,
+    CHAT_PROVIDER_IDS
+} from '../constants.js';
+
+const OPENAI_API_MODES = Object.freeze({
+    chatCompletions: 'chat-completions',
+    responses: 'responses'
+});
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
@@ -55,6 +64,46 @@ function parseOpenAiStreamDelta(responseData) {
         .join('');
 }
 
+function parseOpenAiResponseText(responseData) {
+    if (typeof responseData?.output_text === 'string' && responseData.output_text) {
+        return responseData.output_text;
+    }
+
+    const outputItems = Array.isArray(responseData?.output) ? responseData.output : [];
+    return outputItems
+        .map((item) => {
+            if (typeof item?.text === 'string') {
+                return item.text;
+            }
+
+            const contentItems = Array.isArray(item?.content) ? item.content : [];
+            return contentItems
+                .map((contentItem) => {
+                    if (typeof contentItem?.text === 'string') {
+                        return contentItem.text;
+                    }
+
+                    if (typeof contentItem?.content === 'string') {
+                        return contentItem.content;
+                    }
+
+                    return '';
+                })
+                .filter(Boolean)
+                .join('');
+        })
+        .filter(Boolean)
+        .join('');
+}
+
+function parseOpenAiResponseStreamDelta(responseData) {
+    if (typeof responseData?.delta === 'string' && responseData.delta) {
+        return responseData.delta;
+    }
+
+    return '';
+}
+
 function buildMarkerInstruction(enableMarkerSplit) {
     if (!enableMarkerSplit) {
         return '';
@@ -85,7 +134,7 @@ function buildSystemInstruction(config, enableMarkerSplit) {
     return `${basePrompt}\n\n${markerInstruction}`;
 }
 
-function buildOpenAiRequestBody(contextMessages, config, {
+function buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
     enableMarkerSplit = false,
     stream = false
 } = {}) {
@@ -125,6 +174,54 @@ function buildOpenAiRequestBody(contextMessages, config, {
     }
 
     return body;
+}
+
+function buildOpenAiResponsesRequestBody(contextMessages, config, {
+    enableMarkerSplit = false,
+    stream = false
+} = {}) {
+    const systemInstruction = buildSystemInstruction(config, enableMarkerSplit);
+    const input = contextMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content
+    }));
+    const body = {
+        model: config.model,
+        input,
+        stream
+    };
+
+    if (systemInstruction) {
+        body.instructions = systemInstruction;
+    }
+
+    if (typeof config?.thinkingBudget === 'string' && config.thinkingBudget) {
+        body.reasoning = {
+            effort: config.thinkingBudget
+        };
+    }
+
+    if (typeof config?.searchMode === 'string' && config.searchMode.startsWith('openai_web_search_')) {
+        const contextSize = config.searchMode.replace('openai_web_search_', '');
+        body.tools = [{
+            type: 'web_search_preview',
+            search_context_size: contextSize
+        }];
+    }
+
+    return body;
+}
+
+function isResponsesMode(apiMode) {
+    return apiMode === OPENAI_API_MODES.responses;
+}
+
+function buildOpenAiEndpoint(baseUrl, apiMode) {
+    if (isResponsesMode(apiMode)) {
+        return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
+    }
+
+    return baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
 }
 
 async function readErrorDetails(response) {
@@ -298,7 +395,9 @@ function buildApiKeys(config) {
         .filter(Boolean);
 }
 
-export function createOpenAiProvider({
+function createOpenAiProviderByMode({
+    providerId,
+    apiMode,
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
     maxRetryDelayMs = 8000
@@ -307,8 +406,16 @@ export function createOpenAiProvider({
         throw new Error('fetch implementation is required for OpenAI provider.');
     }
 
+    if (!providerId || typeof providerId !== 'string') {
+        throw new Error('OpenAI provider id is required.');
+    }
+
+    if (apiMode !== OPENAI_API_MODES.chatCompletions && apiMode !== OPENAI_API_MODES.responses) {
+        throw new Error('Unsupported OpenAI API mode.');
+    }
+
     return {
-        id: 'openai',
+        id: providerId,
         async generate({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
             const baseUrl = normalizeApiUrl(config?.apiUrl);
             if (!baseUrl) {
@@ -324,12 +431,17 @@ export function createOpenAiProvider({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = `${baseUrl}/chat/completions`;
+            const endpoint = buildOpenAiEndpoint(baseUrl, apiMode);
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildOpenAiRequestBody(contextMessages, config, {
-                enableMarkerSplit,
-                stream: false
-            });
+            const requestBody = isResponsesMode(apiMode)
+                ? buildOpenAiResponsesRequestBody(contextMessages, config, {
+                    enableMarkerSplit,
+                    stream: false
+                })
+                : buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
+                    enableMarkerSplit,
+                    stream: false
+                });
             const hasBackupKey = apiKeys.length > 1;
             let lastError = null;
             let fallbackNoticeShown = false;
@@ -356,7 +468,9 @@ export function createOpenAiProvider({
                     }
 
                     const responseData = await response.json();
-                    const assistantRawText = parseOpenAiText(responseData);
+                    const assistantRawText = isResponsesMode(apiMode)
+                        ? parseOpenAiResponseText(responseData)
+                        : parseOpenAiText(responseData);
 
                     return {
                         segments: splitAssistantMessageByMarker(assistantRawText, {
@@ -399,12 +513,17 @@ export function createOpenAiProvider({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = `${baseUrl}/chat/completions`;
+            const endpoint = buildOpenAiEndpoint(baseUrl, apiMode);
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildOpenAiRequestBody(contextMessages, config, {
-                enableMarkerSplit,
-                stream: true
-            });
+            const requestBody = isResponsesMode(apiMode)
+                ? buildOpenAiResponsesRequestBody(contextMessages, config, {
+                    enableMarkerSplit,
+                    stream: true
+                })
+                : buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
+                    enableMarkerSplit,
+                    stream: true
+                });
             const hasBackupKey = apiKeys.length > 1;
             let fallbackNoticeShown = false;
             let emittedAnyDelta = false;
@@ -432,7 +551,9 @@ export function createOpenAiProvider({
                     }
 
                     for await (const payload of readSseJsonEvents(response, signal)) {
-                        const deltaText = parseOpenAiStreamDelta(payload);
+                        const deltaText = isResponsesMode(apiMode)
+                            ? parseOpenAiResponseStreamDelta(payload)
+                            : parseOpenAiStreamDelta(payload);
                         if (!deltaText) {
                             continue;
                         }
@@ -469,4 +590,20 @@ export function createOpenAiProvider({
             throw lastError || new Error('OpenAI stream request failed.');
         }
     };
+}
+
+export function createOpenAiProvider(options = {}) {
+    return createOpenAiProviderByMode({
+        ...options,
+        providerId: CHAT_PROVIDER_IDS.openai,
+        apiMode: OPENAI_API_MODES.chatCompletions
+    });
+}
+
+export function createOpenAiResponsesProvider(options = {}) {
+    return createOpenAiProviderByMode({
+        ...options,
+        providerId: CHAT_PROVIDER_IDS.openaiResponses,
+        apiMode: OPENAI_API_MODES.responses
+    });
 }

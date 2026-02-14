@@ -117,6 +117,18 @@ test('config manager keeps provider specific credentials and models when switchi
     elements.cfgThinkingBudget.value = 'medium';
     elements.cfgSearchMode.value = 'openai_web_search_high';
 
+    elements.cfgProvider.value = 'openai_responses';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgUrl.value, 'https://api.openai.com/v1');
+    assert.equal(elements.cfgModel.value, 'gpt-4o-mini');
+
+    elements.cfgUrl.value = 'https://api.openai.com/v1';
+    elements.cfgKey.value = 'openai-responses-key';
+    elements.cfgModel.value = 'gpt-4o-mini';
+    elements.cfgThinkingBudget.value = 'high';
+    elements.cfgSearchMode.value = 'openai_web_search_medium';
+
     elements.cfgProvider.value = 'anthropic';
     elements.cfgProvider.dispatchEvent(new Event('change'));
 
@@ -153,6 +165,30 @@ test('config manager keeps provider specific credentials and models when switchi
     assert.equal(elements.cfgThinkingBudget.value, '2048');
     assert.equal(elements.cfgSearchMode.value, 'anthropic_web_search');
 
+    elements.cfgProvider.value = 'openai';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgKey.value, 'openai-key');
+    assert.equal(elements.cfgModel.value, 'gpt-4o-mini');
+    assert.equal(elements.cfgThinkingBudget.value, 'medium');
+    assert.equal(elements.cfgSearchMode.value, 'openai_web_search_high');
+
+    elements.cfgProvider.value = 'openai_responses';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgKey.value, 'openai-responses-key');
+    assert.equal(elements.cfgModel.value, 'gpt-4o-mini');
+    assert.equal(elements.cfgThinkingBudget.value, 'high');
+    assert.equal(elements.cfgSearchMode.value, 'openai_web_search_medium');
+
+    elements.cfgProvider.value = 'anthropic';
+    elements.cfgProvider.dispatchEvent(new Event('change'));
+
+    assert.equal(elements.cfgKey.value, 'anthropic-key');
+    assert.equal(elements.cfgModel.value, 'claude-sonnet-4-5-20250929');
+    assert.equal(elements.cfgThinkingBudget.value, '2048');
+    assert.equal(elements.cfgSearchMode.value, 'anthropic_web_search');
+
     manager.saveConfig();
     const saved = JSON.parse(storage.getItem('llm_chat_config'));
     assert.equal(saved.provider, 'anthropic');
@@ -160,6 +196,9 @@ test('config manager keeps provider specific credentials and models when switchi
     assert.equal(saved.profiles.openai.model, 'gpt-4o-mini');
     assert.equal(saved.profiles.openai.thinkingBudget, 'medium');
     assert.equal(saved.profiles.openai.searchMode, 'openai_web_search_high');
+    assert.equal(saved.profiles.openai_responses.model, 'gpt-4o-mini');
+    assert.equal(saved.profiles.openai_responses.thinkingBudget, 'high');
+    assert.equal(saved.profiles.openai_responses.searchMode, 'openai_web_search_medium');
     assert.equal(saved.profiles.anthropic.model, 'claude-sonnet-4-5-20250929');
     assert.equal(saved.profiles.anthropic.thinkingBudget, 2048);
     assert.equal(saved.profiles.anthropic.searchMode, 'anthropic_web_search');

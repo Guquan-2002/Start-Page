@@ -428,7 +428,8 @@ export function createApiManager({
         const config = configManager.getConfig();
         const providerLabelMap = {
             gemini: 'Gemini',
-            openai: 'OpenAI',
+            openai: 'OpenAI Chat Completions',
+            openai_responses: 'OpenAI Responses',
             anthropic: 'Anthropic'
         };
         const providerLabel = providerLabelMap[config.provider] || 'provider';

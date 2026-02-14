@@ -9,6 +9,7 @@ export const ASSISTANT_SENTENCE_MARKER = '<|END_SENTENCE|>';
 export const CHAT_PROVIDER_IDS = Object.freeze({
     gemini: 'gemini',
     openai: 'openai',
+    openaiResponses: 'openai_responses',
     anthropic: 'anthropic'
 });
 
@@ -45,6 +46,13 @@ export const OPENAI_DEFAULTS = Object.freeze({
     ...COMMON_CHAT_DEFAULTS
 });
 
+export const OPENAI_RESPONSES_DEFAULTS = Object.freeze({
+    provider: CHAT_PROVIDER_IDS.openaiResponses,
+    apiUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4o-mini',
+    ...COMMON_CHAT_DEFAULTS
+});
+
 export const ANTHROPIC_DEFAULTS = Object.freeze({
     provider: CHAT_PROVIDER_IDS.anthropic,
     apiUrl: 'https://api.anthropic.com/v1',
@@ -59,6 +67,10 @@ export const CHAT_DEFAULTS = Object.freeze({
 export function getProviderDefaults(providerId) {
     if (providerId === CHAT_PROVIDER_IDS.openai) {
         return OPENAI_DEFAULTS;
+    }
+
+    if (providerId === CHAT_PROVIDER_IDS.openaiResponses) {
+        return OPENAI_RESPONSES_DEFAULTS;
     }
 
     if (providerId === CHAT_PROVIDER_IDS.anthropic) {
