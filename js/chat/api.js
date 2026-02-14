@@ -1,4 +1,4 @@
-﻿import { buildContextPreview, buildContextWindow, normalizeMaxContextMessages } from './core/context-window.js';
+﻿import { buildContextPreview, buildLocalMessageEnvelope, normalizeMaxContextMessages } from './core/context-window.js';
 import { createChatMessage, createTurnId, getMessageDisplayContent } from './core/message-model.js';
 import { createMarkerStreamSplitter } from './core/marker-stream-splitter.js';
 import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from './core/prefix.js';
@@ -73,6 +73,19 @@ function resizeInputToContent(chatInput) {
     chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
 }
 
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => reject(new Error('Failed to read image file.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function formatAttachmentNotice(count) {
+    return count === 1 ? '已附加 1 张图片' : `已附加 ${count} 张图片`;
+}
+
 export function createApiManager({
     store,
     elements,
@@ -85,7 +98,13 @@ export function createApiManager({
 }) {
     const providerClient = assertProvider(provider);
 
-    const { chatInput, settingsDiv } = elements;
+    const {
+        chatInput,
+        attachBtn = null,
+        imageInput = null,
+        attachmentsEl = null,
+        settingsDiv
+    } = elements;
     const {
         connectTimeoutMs,
         maxContextTokens = 200000,
@@ -93,6 +112,7 @@ export function createApiManager({
     } = constants;
 
     let contextTrimNoticeShown = false;
+    let pendingImageParts = [];
 
     function notifyConversationUpdated() {
         if (typeof onConversationUpdated === 'function') {
@@ -142,6 +162,92 @@ export function createApiManager({
         appendMessagesToUi([message]);
         notifyConversationUpdated();
         return message;
+    }
+
+    function updateAttachmentButtonState() {
+        if (!attachBtn) {
+            return;
+        }
+
+        attachBtn.classList.toggle('has-attachments', pendingImageParts.length > 0);
+        attachBtn.title = pendingImageParts.length > 0
+            ? formatAttachmentNotice(pendingImageParts.length)
+            : 'Attach images';
+    }
+
+    function renderAttachmentPreview() {
+        if (!attachmentsEl) {
+            updateAttachmentButtonState();
+            return;
+        }
+
+        attachmentsEl.innerHTML = '';
+        pendingImageParts.forEach((part, index) => {
+            const chip = document.createElement('div');
+            chip.className = 'chat-attachment-chip';
+
+            const image = document.createElement('img');
+            image.src = part.image.value;
+            image.alt = `attachment-${index + 1}`;
+            chip.appendChild(image);
+
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'chat-attachment-remove';
+            removeBtn.textContent = '×';
+            removeBtn.title = 'Remove image';
+            removeBtn.addEventListener('click', () => {
+                pendingImageParts = pendingImageParts.filter((_, i) => i !== index);
+                renderAttachmentPreview();
+            });
+            chip.appendChild(removeBtn);
+
+            attachmentsEl.appendChild(chip);
+        });
+
+        updateAttachmentButtonState();
+    }
+
+    function clearPendingImages() {
+        pendingImageParts = [];
+        if (imageInput) {
+            imageInput.value = '';
+        }
+        renderAttachmentPreview();
+    }
+
+    async function appendImageFiles(files) {
+        if (!Array.isArray(files) || files.length === 0) {
+            return;
+        }
+
+        const nextParts = [];
+        for (const file of files) {
+            if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) {
+                continue;
+            }
+
+            const dataUrl = await fileToDataUrl(file);
+            if (!dataUrl) {
+                continue;
+            }
+
+            nextParts.push({
+                type: 'image',
+                image: {
+                    sourceType: 'data_url',
+                    value: dataUrl,
+                    mimeType: file.type
+                }
+            });
+        }
+
+        if (nextParts.length === 0) {
+            return;
+        }
+
+        pendingImageParts = [...pendingImageParts, ...nextParts];
+        renderAttachmentPreview();
     }
 
     function refillFailedInput(text) {
@@ -228,10 +334,13 @@ export function createApiManager({
     async function generateAssistantResponse(config, turnId, failedInputText) {
         const requestSessionId = store.getActiveSessionId();
         const effectiveMaxContextMessages = resolveContextMaxMessages(maxContextMessages);
-        const contextWindow = buildContextWindow(
+        const contextWindow = buildLocalMessageEnvelope(
             store.getActiveMessages(),
-            maxContextTokens,
-            effectiveMaxContextMessages
+            config,
+            {
+                maxContextTokens,
+                maxContextMessages: effectiveMaxContextMessages
+            }
         );
 
         notifyContextTrim(contextWindow.isTrimmed);
@@ -271,6 +380,7 @@ export function createApiManager({
             const response = await providerClient.generate({
                 config,
                 contextMessages: contextWindow.messages,
+                localMessageEnvelope: contextWindow,
                 signal: abortController.signal,
                 onRetryNotice: (attempt, maxRetries, delayMs) => {
                     ui.showRetryNotice(attempt, maxRetries, delayMs);
@@ -314,6 +424,7 @@ export function createApiManager({
             const stream = providerClient.generateStream({
                 config,
                 contextMessages: contextWindow.messages,
+                localMessageEnvelope: contextWindow,
                 signal: abortController.signal,
                 onRetryNotice: (attempt, maxRetries, delayMs) => {
                     ui.showRetryNotice(attempt, maxRetries, delayMs);
@@ -421,7 +532,12 @@ export function createApiManager({
 
     async function sendMessage() {
         const text = chatInput.value.trim();
-        if (!text || store.isStreaming()) {
+        if (store.isStreaming()) {
+            return;
+        }
+
+        const hasImages = pendingImageParts.length > 0;
+        if (!text && !hasImages) {
             return;
         }
 
@@ -459,7 +575,21 @@ export function createApiManager({
 
         const timestampPrefix = buildTimestampPrefix(config, userCreatedAt);
         const userNamePrefix = buildMessagePrefix(config);
-        const userContextText = applyMessagePrefix(text, userNamePrefix);
+        const userContextText = text ? applyMessagePrefix(text, userNamePrefix) : '';
+        const parts = [];
+        if (text) {
+            parts.push({
+                type: 'text',
+                text: userContextText || text
+            });
+        }
+        if (hasImages) {
+            parts.push(...pendingImageParts);
+        }
+        const contentFallback = text || (hasImages ? '[Image]' : '');
+        const displayContent = text
+            ? userContextText
+            : formatAttachmentNotice(pendingImageParts.length);
 
         const messagesToAppend = [];
 
@@ -481,11 +611,12 @@ export function createApiManager({
 
         messagesToAppend.push(createChatMessage({
             role: 'user',
-            content: text,
+            content: contentFallback,
             turnId,
             metaOptions: {
-                displayContent: userContextText,
-                contextContent: userContextText,
+                displayContent,
+                contextContent: userContextText || contentFallback,
+                parts,
                 createdAt: userCreatedAt
             }
         }));
@@ -495,6 +626,7 @@ export function createApiManager({
         notifyConversationUpdated();
 
         chatInput.value = '';
+        clearPendingImages();
         resizeInputToContent(chatInput);
 
         await generateAssistantResponse(config, turnId, text);
@@ -503,6 +635,44 @@ export function createApiManager({
     function stopGeneration() {
         store.requestAbort('user');
     }
+
+    if (attachBtn && imageInput) {
+        attachBtn.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        imageInput.addEventListener('change', async () => {
+            const files = Array.from(imageInput.files || []);
+            try {
+                await appendImageFiles(files);
+            } catch (error) {
+                ui.addSystemNotice(error?.message || 'Failed to attach image.', 3000);
+            } finally {
+                imageInput.value = '';
+            }
+        });
+    }
+
+    chatInput.addEventListener('paste', async (event) => {
+        const items = Array.from(event.clipboardData?.items || []);
+        const imageFiles = items
+            .filter((item) => typeof item?.type === 'string' && item.type.startsWith('image/'))
+            .map((item) => item.getAsFile())
+            .filter(Boolean);
+
+        if (imageFiles.length === 0) {
+            return;
+        }
+
+        event.preventDefault();
+        try {
+            await appendImageFiles(imageFiles);
+        } catch (error) {
+            ui.addSystemNotice(error?.message || 'Failed to paste image.', 3000);
+        }
+    });
+
+    renderAttachmentPreview();
 
     return {
         sendMessage,

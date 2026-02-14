@@ -107,3 +107,26 @@ test('normalizeChatMessage keeps interrupted meta flag', () => {
     assert.ok(normalized);
     assert.equal(normalized.meta.interrupted, true);
 });
+
+test('createChatMessage preserves extensible meta.parts payload', () => {
+    const message = createChatMessage({
+        role: 'user',
+        content: 'with image',
+        turnId: 'turn_parts',
+        metaOptions: {
+            parts: [
+                { type: 'text', text: 'with image' },
+                {
+                    type: 'image',
+                    image: {
+                        sourceType: 'url',
+                        value: 'https://example.com/image.png'
+                    }
+                }
+            ]
+        }
+    });
+
+    assert.equal(Array.isArray(message.meta.parts), true);
+    assert.equal(message.meta.parts[1].image.value, 'https://example.com/image.png');
+});

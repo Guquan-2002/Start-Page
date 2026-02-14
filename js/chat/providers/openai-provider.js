@@ -1,9 +1,8 @@
+import { buildLocalMessageEnvelope } from '../core/local-message.js';
 import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import {
-    ASSISTANT_SEGMENT_MARKER,
-    ASSISTANT_SENTENCE_MARKER,
-    CHAT_PROVIDER_IDS
-} from '../constants.js';
+import { CHAT_PROVIDER_IDS } from '../constants.js';
+import { buildProviderRequest } from './format-router.js';
+import { buildSystemInstruction } from './system-instruction.js';
 
 const OPENAI_API_MODES = Object.freeze({
     chatCompletions: 'chat-completions',
@@ -12,11 +11,6 @@ const OPENAI_API_MODES = Object.freeze({
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
-}
-
-function normalizeApiUrl(apiUrl) {
-    const trimmed = typeof apiUrl === 'string' ? apiUrl.trim().replace(/\/+$/, '') : '';
-    return trimmed || null;
 }
 
 function extractTextFromContent(content) {
@@ -104,124 +98,22 @@ function parseOpenAiResponseStreamDelta(responseData) {
     return '';
 }
 
-function buildMarkerInstruction(enableMarkerSplit) {
-    if (!enableMarkerSplit) {
-        return '';
-    }
-
-    return [
-        'Formatting rules:',
-        `- When you need role-level segment boundaries, use ${ASSISTANT_SEGMENT_MARKER}.`,
-        `- After each completed sentence in normal prose, append ${ASSISTANT_SENTENCE_MARKER}.`,
-        '- Do not output marker tokens inside code blocks, tables, URLs, or inline code.'
-    ].join('\n');
-}
-
-function buildSystemInstruction(config, enableMarkerSplit) {
-    const basePrompt = typeof config?.systemPrompt === 'string'
-        ? config.systemPrompt.trim()
-        : '';
-    const markerInstruction = buildMarkerInstruction(enableMarkerSplit);
-
-    if (!basePrompt) {
-        return markerInstruction;
-    }
-
-    if (!markerInstruction) {
-        return basePrompt;
-    }
-
-    return `${basePrompt}\n\n${markerInstruction}`;
-}
-
-function buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
-    enableMarkerSplit = false,
-    stream = false
-} = {}) {
-    const systemInstruction = buildSystemInstruction(config, enableMarkerSplit);
-    const messages = [];
-
-    if (systemInstruction) {
-        messages.push({
-            role: 'system',
-            content: systemInstruction
-        });
-    }
-
-    contextMessages.forEach((message) => {
-        const role = message.role === 'assistant' ? 'assistant' : 'user';
-        messages.push({
-            role,
-            content: message.content
-        });
-    });
-
-    const body = {
-        model: config.model,
-        messages,
-        stream
-    };
-
-    if (typeof config?.thinkingBudget === 'string' && config.thinkingBudget) {
-        body.reasoning_effort = config.thinkingBudget;
-    }
-
-    if (typeof config?.searchMode === 'string' && config.searchMode.startsWith('openai_web_search_')) {
-        const contextSize = config.searchMode.replace('openai_web_search_', '');
-        body.web_search_options = {
-            search_context_size: contextSize
-        };
-    }
-
-    return body;
-}
-
-function buildOpenAiResponsesRequestBody(contextMessages, config, {
-    enableMarkerSplit = false,
-    stream = false
-} = {}) {
-    const systemInstruction = buildSystemInstruction(config, enableMarkerSplit);
-    const input = contextMessages.map((message) => ({
-        role: message.role === 'assistant' ? 'assistant' : 'user',
-        content: message.content
-    }));
-    const body = {
-        model: config.model,
-        input,
-        stream
-    };
-
-    if (systemInstruction) {
-        body.instructions = systemInstruction;
-    }
-
-    if (typeof config?.thinkingBudget === 'string' && config.thinkingBudget) {
-        body.reasoning = {
-            effort: config.thinkingBudget
-        };
-    }
-
-    if (typeof config?.searchMode === 'string' && config.searchMode.startsWith('openai_web_search_')) {
-        const contextSize = config.searchMode.replace('openai_web_search_', '');
-        body.tools = [{
-            type: 'web_search_preview',
-            search_context_size: contextSize
-        }];
-    }
-
-    return body;
-}
-
 function isResponsesMode(apiMode) {
     return apiMode === OPENAI_API_MODES.responses;
 }
 
-function buildOpenAiEndpoint(baseUrl, apiMode) {
-    if (isResponsesMode(apiMode)) {
-        return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
-    }
+function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
+    const normalizedEnvelope = buildLocalMessageEnvelope(
+        localMessageEnvelope || { messages: contextMessages },
+        {
+            fallbackSystemInstruction: typeof config?.systemPrompt === 'string' ? config.systemPrompt : ''
+        }
+    );
 
-    return baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
+    return {
+        ...normalizedEnvelope,
+        systemInstruction: buildSystemInstruction(config, enableMarkerSplit)
+    };
 }
 
 async function readErrorDetails(response) {
@@ -416,12 +308,14 @@ function createOpenAiProviderByMode({
 
     return {
         id: providerId,
-        async generate({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('OpenAI API URL is required.');
-            }
-
+        async generate({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('OpenAI model is required.');
             }
@@ -431,30 +325,30 @@ function createOpenAiProviderByMode({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = buildOpenAiEndpoint(baseUrl, apiMode);
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = isResponsesMode(apiMode)
-                ? buildOpenAiResponsesRequestBody(contextMessages, config, {
-                    enableMarkerSplit,
-                    stream: false
-                })
-                : buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
-                    enableMarkerSplit,
-                    stream: false
-                });
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
+                enableMarkerSplit
+            );
             const hasBackupKey = apiKeys.length > 1;
             let lastError = null;
             let fallbackNoticeShown = false;
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoint, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: false,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${apiKeys[keyIndex]}`
-                        },
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,
@@ -498,12 +392,14 @@ function createOpenAiProviderByMode({
             throw lastError || new Error('OpenAI request failed.');
         },
 
-        async *generateStream({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('OpenAI API URL is required.');
-            }
-
+        async *generateStream({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('OpenAI model is required.');
             }
@@ -513,17 +409,13 @@ function createOpenAiProviderByMode({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = buildOpenAiEndpoint(baseUrl, apiMode);
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = isResponsesMode(apiMode)
-                ? buildOpenAiResponsesRequestBody(contextMessages, config, {
-                    enableMarkerSplit,
-                    stream: true
-                })
-                : buildOpenAiChatCompletionsRequestBody(contextMessages, config, {
-                    enableMarkerSplit,
-                    stream: true
-                });
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
+                enableMarkerSplit
+            );
             const hasBackupKey = apiKeys.length > 1;
             let fallbackNoticeShown = false;
             let emittedAnyDelta = false;
@@ -531,13 +423,17 @@ function createOpenAiProviderByMode({
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoint, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: true,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: `Bearer ${apiKeys[keyIndex]}`
-                        },
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,

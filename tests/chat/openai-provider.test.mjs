@@ -266,7 +266,14 @@ test('openai provider supports responses API for non-stream requests', async () 
     });
 
     assert.equal(requestUrl, 'https://api.openai.com/v1/responses');
-    assert.deepEqual(requestBody.input, [{ role: 'user', content: 'hello' }]);
+    assert.deepEqual(requestBody.input, [{
+        type: 'message',
+        role: 'user',
+        content: [{
+            type: 'input_text',
+            text: 'hello'
+        }]
+    }]);
     assert.equal(requestBody.instructions.includes('You are a helpful assistant.'), true);
     assert.deepEqual(result.segments, ['responses ok']);
 });

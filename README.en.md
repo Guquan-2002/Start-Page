@@ -1,6 +1,6 @@
 ﻿# Start Page
 
-A browser start page built with native ES Modules, featuring dynamic themes, weather, network-aware search, and multi-provider chat (Gemini / OpenAI / Anthropic).
+A browser start page built with native ES Modules, featuring dynamic themes, weather, network-aware search, and multi-provider chat (Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic), with text+image input support.
 Chinese version: [README.md](README.md)
 
 ## Highlights
@@ -10,14 +10,15 @@ Chinese version: [README.md](README.md)
 - Weather widget (API key or proxy mode)
 - Network status checks with automatic search engine switching (Google / Bing / offline)
 - Starfield visual effects
-- Multi-provider chat panel (Gemini / OpenAI / Anthropic)
+- Multi-provider chat panel (Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic)
 - Chat session management (create / switch / rename / delete / clear)
 - Retry by `turnId` (regenerate from a selected user turn)
-- Chat context window controls (message count + token budget)
+- Chat context window controls (message count + token budget, multimodal-aware)
 - Pseudo-stream output (toggleable, front-end progressive rendering)
 - Per-session draft autosave (toggleable, restored on switch/reload)
 - One-click "Refill input" on error bubble (refill only, no auto-send)
 - Provider-specific config profiles (switching provider restores URL/key/model/thinking/search; OpenAI Reasoning Effort persists)
+- Image input in chat box (button upload / paste image, optionally mixed with text)
 - Node built-in tests for chat core logic
 
 ## Tech Stack
@@ -64,6 +65,7 @@ home/
 |       |-- ui.js
 |       |-- core/
 |       |   |-- message-model.js
+|       |   |-- local-message.js
 |       |   |-- marker-stream-splitter.js
 |       |   |-- context-window.js
 |       |   |-- prefix.js
@@ -76,9 +78,16 @@ home/
 |       `-- providers/
 |           |-- provider-interface.js
 |           |-- provider-router.js
+|           |-- format-router.js
+|           |-- system-instruction.js
 |           |-- gemini-provider.js
 |           |-- openai-provider.js
-|           `-- anthropic-provider.js
+|           |-- anthropic-provider.js
+|           `-- adapters/
+|               |-- gemini-generate-content.js
+|               |-- openai-chat-completions.js
+|               |-- openai-responses.js
+|               `-- anthropic-messages.js
 |-- tests/
 |   `-- chat/
 |       |-- anthropic-provider.test.mjs
@@ -91,21 +100,12 @@ home/
 |       |-- openai-provider.test.mjs
 |       |-- marker-stream-splitter.test.mjs
 |       |-- pseudo-stream.test.mjs
+|       |-- local-message.test.mjs
+|       |-- format-router.test.mjs
 |       `-- draft-storage.test.mjs
 |-- README.md
 `-- README.en.md
 ```
-
-## Chat Architecture Layers
-
-- `js/chat.js`: composition root (wires store / provider / UI / history / config / drafts)
-- `js/chat/state/session-store.js`: single state entry for sessions + generation lifecycle
-- `js/chat/storage/history-storage.js`: `llm_chat_history_v2` read/write and schema normalization
-- `js/chat/storage/draft-storage.js`: `llm_chat_drafts_v1` draft read/write and normalization
-- `js/chat/core/*`: pure logic (message model, prefixes, context window, pseudo-stream chunking/runner)
-- `js/chat/providers/provider-router.js`: routes by `config.provider` to Gemini/OpenAI/Anthropic
-- `js/chat/providers/*-provider.js`: provider request handling (stream/non-stream), retry, backup-key fallback, error handling
-- `js/chat/ui.js` + `js/chat/history.js`: rendering and interaction control (no direct persistence)
 
 ## Quick Start
 
@@ -153,11 +153,11 @@ localStorage.setItem('startpage_config', JSON.stringify({
 }));
 ```
 
-### 2) Chat (Gemini / OpenAI / Anthropic)
+### 2) Chat (Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic)
 
 Configure in chat settings:
 
-- Provider (Gemini / OpenAI / Anthropic)
+- Provider (Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic)
 - API URL defaults:
   - Gemini: `https://generativelanguage.googleapis.com/v1beta`
   - OpenAI: `https://api.openai.com/v1`
@@ -174,16 +174,18 @@ Configure in chat settings:
   - OpenAI: `openai_web_search_low|medium|high`
 - Experience toggles (pseudo-stream, draft autosave)
 - Message prefix (timestamp, user name)
+- Image input (upload via image button, or paste images; can be sent with text)
 
 Note: config is stored per provider. Switching provider restores that provider profile. OpenAI Reasoning Effort is preserved across switches.
 
 ## Chat Behavior Notes
 
-- Gemini / OpenAI / Anthropic are supported through the provider router
-- Sessions are persisted in `llm_chat_history_v2` (schema version 2)
+- Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic are supported through the provider router
+- Sessions are persisted in `llm_chat_history_v2` (schema version 3)
 - Drafts are persisted per session in `llm_chat_drafts_v1`
 - With pseudo-stream enabled, real-time marker split is used: `<|CHANGE_ROLE|>` and `<|END_SENTENCE|>` trigger segment flush
 - With pseudo-stream disabled, marker tokens are not split (treated as plain text)
+- User messages support multi-part `text + image`, then convert by provider via format router
 - Stop behavior: abort during request; stop render loop during pseudo-stream and keep partial output
 - Request failures show an error bubble with a "Refill input" action
 - Retry on a user message rolls back by `turnId` (that turn and all later messages)
@@ -192,7 +194,7 @@ Note: config is stored per provider. Switching provider restores that provider p
 ## Local Storage Keys
 
 - `llm_chat_config`: chat configuration
-- `llm_chat_history_v2`: chat session history (v2)
+- `llm_chat_history_v2`: chat session history (schema version 3)
 - `llm_chat_drafts_v1`: chat drafts (per session)
 - `startpage_config`: runtime settings (weather, etc.)
 

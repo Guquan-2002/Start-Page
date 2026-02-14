@@ -170,11 +170,13 @@ test('anthropic provider maps thinking budget and web search format', async () =
         type: 'web_search_20250305',
         name: 'web_search'
     }]);
-    assert.equal(typeof requestBody.system, 'undefined');
+    assert.equal(typeof requestBody.system, 'string');
+    assert.ok(requestBody.system.includes('You are a helpful assistant.'));
     assert.equal(requestBody.messages[0].role, 'user');
-    assert.ok(requestBody.messages[0].content.includes('<system>'));
-    assert.ok(requestBody.messages[0].content.includes('You are a helpful assistant.'));
-    assert.ok(requestBody.messages[0].content.includes('hello'));
+    assert.deepEqual(requestBody.messages[0].content, [{
+        type: 'text',
+        text: 'hello'
+    }]);
 });
 
 test('anthropic provider stream does not switch to backup key after first delta', async () => {

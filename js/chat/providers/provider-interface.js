@@ -1,7 +1,8 @@
 /**
  * @typedef {Object} ProviderGenerateParams
  * @property {Object} config
- * @property {Array<{role: string, content: string}>} contextMessages
+ * @property {Array<{role: string, content?: string, parts?: Array<Object>}>} contextMessages
+ * @property {{systemInstruction?: string, messages?: Array<Object>}} [localMessageEnvelope]
  * @property {AbortSignal} signal
  * @property {(attempt: number, maxRetries: number, delayMs: number) => void} [onRetryNotice]
  * @property {() => void} [onFallbackKey]

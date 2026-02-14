@@ -1,6 +1,6 @@
 ﻿# Start Page
 
-一个基于原生 ES Modules 的浏览器起始页，集成动态主题、天气、网络感知搜索和多 Provider Chat（Gemini / OpenAI / Anthropic）。
+一个基于原生 ES Modules 的浏览器起始页，集成动态主题、天气、网络感知搜索和多 Provider Chat（Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic），支持文本+图片输入。
 English version: [README.en.md](README.en.md)
 
 ## 功能亮点
@@ -10,14 +10,15 @@ English version: [README.en.md](README.en.md)
 - 天气组件（支持 API Key 或代理模式）
 - 网络状态检测 + 搜索引擎自动切换（Google / Bing / 离线）
 - 星空背景特效
-- 多 Provider 聊天（Gemini / OpenAI / Anthropic）
+- 多 Provider 聊天（Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic）
 - 聊天会话管理（新建 / 切换 / 重命名 / 删除 / 清空）
 - 按 `turnId` 回退重试（从指定用户轮次重新生成）
-- 聊天上下文窗口控制（消息数 + Token 预算）
+- 聊天上下文窗口控制（消息数 + Token 预算，支持多模态消息）
 - 伪流式输出（可开关，前端分段渲染）
 - 按会话草稿自动保存（可开关，切换/刷新可恢复）
 - 失败气泡一键“回填输入框”（仅回填，不自动发送）
 - Provider 独立配置档案（切换 Provider 自动回填 URL/Key/Model/Thinking/Search；OpenAI Reasoning Effort 可保存）
+- 对话框图片输入（点击上传 / 粘贴图片，可与文本混发）
 - Node 内置测试覆盖 chat 核心逻辑
 
 ## 技术栈
@@ -64,6 +65,7 @@ home/
 |       |-- ui.js
 |       |-- core/
 |       |   |-- message-model.js
+|       |   |-- local-message.js
 |       |   |-- marker-stream-splitter.js
 |       |   |-- context-window.js
 |       |   |-- prefix.js
@@ -76,9 +78,16 @@ home/
 |       `-- providers/
 |           |-- provider-interface.js
 |           |-- provider-router.js
+|           |-- format-router.js
+|           |-- system-instruction.js
 |           |-- gemini-provider.js
 |           |-- openai-provider.js
-|           `-- anthropic-provider.js
+|           |-- anthropic-provider.js
+|           `-- adapters/
+|               |-- gemini-generate-content.js
+|               |-- openai-chat-completions.js
+|               |-- openai-responses.js
+|               `-- anthropic-messages.js
 |-- tests/
 |   `-- chat/
 |       |-- anthropic-provider.test.mjs
@@ -91,21 +100,12 @@ home/
 |       |-- openai-provider.test.mjs
 |       |-- marker-stream-splitter.test.mjs
 |       |-- pseudo-stream.test.mjs
+|       |-- local-message.test.mjs
+|       |-- format-router.test.mjs
 |       `-- draft-storage.test.mjs
 |-- README.md
 `-- README.en.md
 ```
-
-## Chat 架构分层
-
-- `js/chat.js`：组合根（装配 store / provider / UI / history / config / drafts）
-- `js/chat/state/session-store.js`：会话 + 生成态单一状态入口
-- `js/chat/storage/history-storage.js`：`llm_chat_history_v2` 读写与 schema 归一化
-- `js/chat/storage/draft-storage.js`：`llm_chat_drafts_v1` 草稿读写与归一化
-- `js/chat/core/*`：纯逻辑（消息模型、前缀、上下文窗口、伪流式分块/执行）
-- `js/chat/providers/provider-router.js`：按 `config.provider` 路由到 Gemini/OpenAI/Anthropic
-- `js/chat/providers/*-provider.js`：Provider 请求、流式/非流式、重试、fallback key、错误处理
-- `js/chat/ui.js` + `js/chat/history.js`：渲染与交互控制（不直接持久化）
 
 ## 快速开始
 
@@ -153,11 +153,11 @@ localStorage.setItem('startpage_config', JSON.stringify({
 }));
 ```
 
-### 2) 聊天配置（Gemini / OpenAI / Anthropic）
+### 2) 聊天配置（Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic）
 
 在聊天设置中配置：
 
-- Provider（Gemini / OpenAI / Anthropic）
+- Provider（Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic）
 - API URL（默认：
   - Gemini: `https://generativelanguage.googleapis.com/v1beta`
   - OpenAI: `https://api.openai.com/v1`
@@ -175,16 +175,18 @@ localStorage.setItem('startpage_config', JSON.stringify({
   - OpenAI：`openai_web_search_low|medium|high`
 - Experience（伪流式开关、草稿自动保存开关）
 - Message Prefix（时间戳、用户名前缀）
+- 图片输入（点击图片按钮上传，或直接粘贴图片；可与文本一起发送）
 
 说明：配置按 Provider 独立保存；切换 Provider 会自动回填对应配置。OpenAI 的 Reasoning Effort 在切换后可持续保留。
 
 ## 聊天行为要点
 
-- 支持 Gemini / OpenAI / Anthropic Provider（统一走 provider router）
-- 会话历史使用 `llm_chat_history_v2`（schema version = 2）
+- 支持 Gemini / OpenAI Chat Completions / OpenAI Responses / Anthropic Provider（统一走 provider router）
+- 会话历史使用 `llm_chat_history_v2`（schema version = 3）
 - 草稿按会话保存到 `llm_chat_drafts_v1`
 - 开启伪流式时支持实时分段：检测 `<|CHANGE_ROLE|>` 与 `<|END_SENTENCE|>` 标记即落地段落
 - 关闭伪流式时不按标记拆分（标记按普通文本处理）
+- 用户消息支持 `text + image` 多 part，本地抽象后再按 Provider 路由转换
 - 点击 Stop：请求中会 Abort；伪流式中会停止渲染并保留已输出内容
 - 请求失败时显示错误气泡，支持“回填输入框”
 - 点击用户消息重试按钮会按 `turnId` 回退该轮及其后续消息
@@ -193,7 +195,7 @@ localStorage.setItem('startpage_config', JSON.stringify({
 ## 本地存储键
 
 - `llm_chat_config`：聊天配置
-- `llm_chat_history_v2`：聊天会话历史（V2）
+- `llm_chat_history_v2`：聊天会话历史（schema version 3）
 - `llm_chat_drafts_v1`：聊天草稿（按会话）
 - `startpage_config`：运行时配置（天气等）
 

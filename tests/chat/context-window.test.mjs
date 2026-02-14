@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildContextWindow } from '../../js/chat/core/context-window.js';
+import { buildContextWindow, buildLocalMessageEnvelope } from '../../js/chat/core/context-window.js';
 
 function createMessage(role, content, turnId) {
     return {
@@ -56,4 +56,46 @@ test('buildContextWindow excludes empty/invalid history rows', () => {
 
     const contextWindow = buildContextWindow(history, 200000, 120);
     assert.deepEqual(contextWindow.messages.map((message) => message.content), ['hello']);
+});
+
+test('buildLocalMessageEnvelope prefers meta.parts over legacy content', () => {
+    const history = [{
+        id: 'u1',
+        turnId: 'turn1',
+        role: 'user',
+        content: 'legacy text',
+        meta: {
+            parts: [
+                { type: 'text', text: 'modern text' },
+                {
+                    type: 'image',
+                    image: {
+                        sourceType: 'url',
+                        value: 'https://example.com/cat.png'
+                    }
+                }
+            ]
+        }
+    }];
+
+    const envelope = buildLocalMessageEnvelope(history, {
+        systemPrompt: 'You are helpful.'
+    }, {
+        maxContextTokens: 200000,
+        maxContextMessages: 120
+    });
+
+    assert.equal(envelope.systemInstruction, 'You are helpful.');
+    assert.equal(envelope.messages.length, 1);
+    assert.deepEqual(envelope.messages[0].parts[0], {
+        type: 'text',
+        text: 'modern text'
+    });
+    assert.deepEqual(envelope.messages[0].parts[1], {
+        type: 'image',
+        image: {
+            sourceType: 'url',
+            value: 'https://example.com/cat.png'
+        }
+    });
 });

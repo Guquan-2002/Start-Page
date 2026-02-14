@@ -125,6 +125,7 @@ export function buildMessageMeta(content, {
     turnId = '',
     displayContent = '',
     contextContent = '',
+    parts = null,
     createdAt = Date.now(),
     tokenEstimate = null,
     displayRole = '',
@@ -153,6 +154,16 @@ export function buildMessageMeta(content, {
 
     if (normalizedContextContent && normalizedContextContent !== normalizedContent) {
         meta.contextContent = normalizedContextContent;
+    }
+
+    if (Array.isArray(parts) && parts.length > 0) {
+        meta.parts = parts.map((part) => {
+            if (!part || typeof part !== 'object') {
+                return null;
+            }
+
+            return JSON.parse(JSON.stringify(part));
+        }).filter(Boolean);
     }
 
     const normalizedDisplayRole = normalizeDisplayRole(displayRole, '');
@@ -235,6 +246,7 @@ export function normalizeChatMessage(rawMessage, {
         turnId: normalizedTurnId,
         displayContent: normalizedCore.displayContent,
         contextContent: typeof normalizedCore.rawMeta.contextContent === 'string' ? normalizedCore.rawMeta.contextContent : '',
+        parts: Array.isArray(normalizedCore.rawMeta.parts) ? normalizedCore.rawMeta.parts : null,
         createdAt: Number.isFinite(normalizedCore.rawMeta.createdAt) ? normalizedCore.rawMeta.createdAt : defaultCreatedAt,
         tokenEstimate: Number.isFinite(normalizedCore.rawMeta.tokenEstimate) ? normalizedCore.rawMeta.tokenEstimate : null,
         displayRole: normalizedCore.rawMeta.displayRole,
@@ -253,12 +265,17 @@ export function normalizeChatMessage(rawMessage, {
 }
 
 export function cloneChatMessage(message) {
+    const meta = message.meta ? { ...message.meta } : undefined;
+    if (Array.isArray(meta?.parts)) {
+        meta.parts = meta.parts.map((part) => JSON.parse(JSON.stringify(part)));
+    }
+
     return {
         id: message.id,
         turnId: message.turnId,
         role: message.role,
         content: message.content,
-        meta: message.meta ? { ...message.meta } : undefined
+        meta
     };
 }
 

@@ -1,13 +1,11 @@
+import { buildLocalMessageEnvelope } from '../core/local-message.js';
 import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../constants.js';
+import { CHAT_PROVIDER_IDS } from '../constants.js';
+import { buildProviderRequest } from './format-router.js';
+import { buildSystemInstruction } from './system-instruction.js';
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
-}
-
-function normalizeApiUrl(apiUrl) {
-    const trimmed = typeof apiUrl === 'string' ? apiUrl.trim().replace(/\/+$/, '') : '';
-    return trimmed || null;
 }
 
 function parseGeminiText(responseData) {
@@ -22,73 +20,17 @@ function parseGeminiText(responseData) {
         .join('');
 }
 
-function buildMarkerInstruction(enableMarkerSplit) {
-    if (!enableMarkerSplit) {
-        return '';
-    }
+function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
+    const normalizedEnvelope = buildLocalMessageEnvelope(
+        localMessageEnvelope || { messages: contextMessages },
+        {
+            fallbackSystemInstruction: typeof config?.systemPrompt === 'string' ? config.systemPrompt : ''
+        }
+    );
 
-    return [
-        'Formatting rules:',
-        `- When you need role-level segment boundaries, use ${ASSISTANT_SEGMENT_MARKER}.`,
-        `- After each completed sentence in normal prose, append ${ASSISTANT_SENTENCE_MARKER}.`,
-        '- Do not output marker tokens inside code blocks, tables, URLs, or inline code.'
-    ].join('\n');
-}
-
-function buildSystemInstruction(config, enableMarkerSplit) {
-    const basePrompt = typeof config?.systemPrompt === 'string'
-        ? config.systemPrompt.trim()
-        : '';
-    const markerInstruction = buildMarkerInstruction(enableMarkerSplit);
-
-    if (!basePrompt) {
-        return markerInstruction;
-    }
-
-    if (!markerInstruction) {
-        return basePrompt;
-    }
-
-    return `${basePrompt}\n\n${markerInstruction}`;
-}
-
-function buildGeminiRequestBody(contextMessages, config, {
-    enableMarkerSplit = false
-} = {}) {
-    const body = {
-        contents: contextMessages.map((message) => ({
-            role: message.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: message.content }]
-        }))
-    };
-
-    const systemInstruction = buildSystemInstruction(config, enableMarkerSplit);
-    if (systemInstruction) {
-        body.systemInstruction = {
-            parts: [{ text: systemInstruction }]
-        };
-    }
-
-    if (config.searchMode === 'gemini_google_search') {
-        body.tools = [{ google_search: {} }];
-    }
-
-    if (Number.isFinite(config.thinkingBudget) && config.thinkingBudget > 0) {
-        body.generationConfig = {
-            thinkingConfig: {
-                thinkingBudget: config.thinkingBudget
-            }
-        };
-    }
-
-    return body;
-}
-
-function buildGeminiEndpoints(baseUrl, model) {
-    const encodedModel = encodeURIComponent(model);
     return {
-        generate: `${baseUrl}/models/${encodedModel}:generateContent`,
-        stream: `${baseUrl}/models/${encodedModel}:streamGenerateContent?alt=sse`
+        ...normalizedEnvelope,
+        systemInstruction: buildSystemInstruction(config, enableMarkerSplit)
     };
 }
 
@@ -317,19 +259,22 @@ export function createGeminiProvider({
         throw new Error('fetch implementation is required for Gemini provider.');
     }
 
-    return {
-        id: 'gemini',
-        async generate({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('Gemini API URL is required.');
-            }
+    const providerId = CHAT_PROVIDER_IDS.gemini;
 
+    return {
+        id: providerId,
+        async generate({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('Gemini model is required.');
             }
 
-            const endpoints = buildGeminiEndpoints(baseUrl, config.model);
             const apiKeys = buildApiKeys(config);
 
             if (!apiKeys.length) {
@@ -337,22 +282,29 @@ export function createGeminiProvider({
             }
 
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildGeminiRequestBody(contextMessages, config, {
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
                 enableMarkerSplit
-            });
+            );
             const hasBackupKey = apiKeys.length > 1;
             let lastError = null;
             let fallbackNoticeShown = false;
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoints.generate, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: false,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-goog-api-key': apiKeys[keyIndex]
-                        },
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,
@@ -394,27 +346,30 @@ export function createGeminiProvider({
             throw lastError || new Error('Gemini request failed.');
         },
 
-        async *generateStream({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('Gemini API URL is required.');
-            }
-
+        async *generateStream({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('Gemini model is required.');
             }
 
-            const endpoints = buildGeminiEndpoints(baseUrl, config.model);
             const apiKeys = buildApiKeys(config);
-
             if (!apiKeys.length) {
                 throw new Error('At least one API key is required.');
             }
 
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildGeminiRequestBody(contextMessages, config, {
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
                 enableMarkerSplit
-            });
+            );
             const hasBackupKey = apiKeys.length > 1;
             let fallbackNoticeShown = false;
             let emittedAnyDelta = false;
@@ -424,13 +379,17 @@ export function createGeminiProvider({
                 let assembledText = '';
 
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoints.stream, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: true,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-goog-api-key': apiKeys[keyIndex]
-                        },
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,

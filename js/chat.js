@@ -40,6 +40,9 @@ function getChatElements() {
         clearAllBtn: $('#chat-clear-all-btn'),
         messagesEl: $('#chat-messages'),
         chatInput: $('#chat-input'),
+        attachBtn: $('#chat-attach-btn'),
+        imageInput: $('#chat-image-input'),
+        attachmentsEl: $('#chat-attachments'),
         sendBtn: $('#chat-send-btn'),
         stopBtn: $('#chat-stop-btn'),
         cfgProvider: $('#cfg-provider'),
@@ -247,6 +250,7 @@ export function initChat() {
         elements: {
             messagesEl: elements.messagesEl,
             chatInput: elements.chatInput,
+            attachBtn: elements.attachBtn,
             sendBtn: elements.sendBtn,
             stopBtn: elements.stopBtn,
             sessionActionButtons: [
@@ -323,6 +327,9 @@ export function initChat() {
         store,
         elements: {
             chatInput: elements.chatInput,
+            attachBtn: elements.attachBtn,
+            imageInput: elements.imageInput,
+            attachmentsEl: elements.attachmentsEl,
             settingsDiv: elements.settingsDiv
         },
         ui,

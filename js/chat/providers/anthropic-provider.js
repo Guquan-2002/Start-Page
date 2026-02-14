@@ -1,17 +1,11 @@
+import { buildLocalMessageEnvelope } from '../core/local-message.js';
 import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../constants.js';
-
-const ANTHROPIC_API_VERSION = '2023-06-01';
-const DEFAULT_MAX_TOKENS = 4096;
-const MIN_THINKING_BUDGET_TOKENS = 1024;
+import { CHAT_PROVIDER_IDS } from '../constants.js';
+import { buildProviderRequest } from './format-router.js';
+import { buildSystemInstruction } from './system-instruction.js';
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
-}
-
-function normalizeApiUrl(apiUrl) {
-    const trimmed = typeof apiUrl === 'string' ? apiUrl.trim().replace(/\/+$/, '') : '';
-    return trimmed || null;
 }
 
 function parseAnthropicText(responseData) {
@@ -40,123 +34,18 @@ function parseAnthropicStreamDelta(responseData) {
         : '';
 }
 
-function normalizeThinkingBudget(rawValue) {
-    const parsed = Number.parseInt(rawValue, 10);
-    if (!Number.isFinite(parsed) || parsed < MIN_THINKING_BUDGET_TOKENS) {
-        return null;
-    }
+function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
+    const normalizedEnvelope = buildLocalMessageEnvelope(
+        localMessageEnvelope || { messages: contextMessages },
+        {
+            fallbackSystemInstruction: typeof config?.systemPrompt === 'string' ? config.systemPrompt : ''
+        }
+    );
 
-    return parsed;
-}
-
-function buildMarkerInstruction(enableMarkerSplit) {
-    if (!enableMarkerSplit) {
-        return '';
-    }
-
-    return [
-        'Formatting rules:',
-        `- When you need role-level segment boundaries, use ${ASSISTANT_SEGMENT_MARKER}.`,
-        `- After each completed sentence in normal prose, append ${ASSISTANT_SENTENCE_MARKER}.`,
-        '- Do not output marker tokens inside code blocks, tables, URLs, or inline code.'
-    ].join('\n');
-}
-
-function buildSystemInstruction(config, enableMarkerSplit) {
-    const basePrompt = typeof config?.systemPrompt === 'string'
-        ? config.systemPrompt.trim()
-        : '';
-    const markerInstruction = buildMarkerInstruction(enableMarkerSplit);
-
-    if (!basePrompt) {
-        return markerInstruction;
-    }
-
-    if (!markerInstruction) {
-        return basePrompt;
-    }
-
-    return `${basePrompt}\n\n${markerInstruction}`;
-}
-
-function asAnthropicMessage(message) {
     return {
-        role: message.role === 'assistant' ? 'assistant' : 'user',
-        content: message.content
+        ...normalizedEnvelope,
+        systemInstruction: buildSystemInstruction(config, enableMarkerSplit)
     };
-}
-
-function injectSystemInstructionIntoMessages(messages, systemInstruction) {
-    if (!systemInstruction) {
-        return messages;
-    }
-
-    const systemEnvelope = `<system>\n${systemInstruction}\n</system>`;
-    if (messages.length === 0) {
-        return [{
-            role: 'user',
-            content: systemEnvelope
-        }];
-    }
-
-    const firstMessage = messages[0];
-    if (firstMessage.role === 'user') {
-        return [{
-            ...firstMessage,
-            content: `${systemEnvelope}\n\n${firstMessage.content}`
-        }, ...messages.slice(1)];
-    }
-
-    return [{
-        role: 'user',
-        content: systemEnvelope
-    }, ...messages];
-}
-
-function resolveMaxTokens(config, thinkingBudget) {
-    if (thinkingBudget) {
-        return Math.max(DEFAULT_MAX_TOKENS, thinkingBudget + 1024);
-    }
-
-    const parsed = Number.parseInt(config?.maxTokens, 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-        return parsed;
-    }
-
-    return DEFAULT_MAX_TOKENS;
-}
-
-function buildAnthropicRequestBody(contextMessages, config, {
-    enableMarkerSplit = false,
-    stream = false
-} = {}) {
-    const thinkingBudget = normalizeThinkingBudget(config?.thinkingBudget);
-    const systemInstruction = buildSystemInstruction(config, enableMarkerSplit);
-    const baseMessages = contextMessages.map(asAnthropicMessage);
-    const messages = injectSystemInstructionIntoMessages(baseMessages, systemInstruction);
-
-    const body = {
-        model: config.model,
-        max_tokens: resolveMaxTokens(config, thinkingBudget),
-        stream,
-        messages
-    };
-
-    if (thinkingBudget) {
-        body.thinking = {
-            type: 'enabled',
-            budget_tokens: thinkingBudget
-        };
-    }
-
-    if (config?.searchMode === 'anthropic_web_search') {
-        body.tools = [{
-            type: 'web_search_20250305',
-            name: 'web_search'
-        }];
-    }
-
-    return body;
 }
 
 async function readErrorDetails(response) {
@@ -326,14 +215,6 @@ function buildApiKeys(config) {
         .filter(Boolean);
 }
 
-function buildHeaders(apiKey) {
-    return {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': ANTHROPIC_API_VERSION
-    };
-}
-
 export function createAnthropicProvider({
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
@@ -343,14 +224,18 @@ export function createAnthropicProvider({
         throw new Error('fetch implementation is required for Anthropic provider.');
     }
 
-    return {
-        id: 'anthropic',
-        async generate({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('Anthropic API URL is required.');
-            }
+    const providerId = CHAT_PROVIDER_IDS.anthropic;
 
+    return {
+        id: providerId,
+        async generate({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('Anthropic model is required.');
             }
@@ -360,22 +245,30 @@ export function createAnthropicProvider({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = `${baseUrl}/messages`;
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildAnthropicRequestBody(contextMessages, config, {
-                enableMarkerSplit,
-                stream: false
-            });
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
+                enableMarkerSplit
+            );
             const hasBackupKey = apiKeys.length > 1;
             let lastError = null;
             let fallbackNoticeShown = false;
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoint, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: false,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: buildHeaders(apiKeys[keyIndex]),
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,
@@ -417,12 +310,14 @@ export function createAnthropicProvider({
             throw lastError || new Error('Anthropic request failed.');
         },
 
-        async *generateStream({ config, contextMessages, signal, onRetryNotice, onFallbackKey }) {
-            const baseUrl = normalizeApiUrl(config?.apiUrl);
-            if (!baseUrl) {
-                throw new Error('Anthropic API URL is required.');
-            }
-
+        async *generateStream({
+            config,
+            contextMessages,
+            localMessageEnvelope,
+            signal,
+            onRetryNotice,
+            onFallbackKey
+        }) {
             if (!config?.model) {
                 throw new Error('Anthropic model is required.');
             }
@@ -432,12 +327,13 @@ export function createAnthropicProvider({
                 throw new Error('At least one API key is required.');
             }
 
-            const endpoint = `${baseUrl}/messages`;
             const enableMarkerSplit = config?.enablePseudoStream === true;
-            const requestBody = buildAnthropicRequestBody(contextMessages, config, {
-                enableMarkerSplit,
-                stream: true
-            });
+            const requestEnvelope = resolveRequestEnvelope(
+                config,
+                contextMessages,
+                localMessageEnvelope,
+                enableMarkerSplit
+            );
             const hasBackupKey = apiKeys.length > 1;
             let fallbackNoticeShown = false;
             let emittedAnyDelta = false;
@@ -445,10 +341,17 @@ export function createAnthropicProvider({
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
                 try {
-                    const response = await fetchWithRetry(fetchImpl, endpoint, {
+                    const request = buildProviderRequest({
+                        providerId,
+                        config,
+                        envelope: requestEnvelope,
+                        stream: true,
+                        apiKey: apiKeys[keyIndex]
+                    });
+                    const response = await fetchWithRetry(fetchImpl, request.endpoint, {
                         method: 'POST',
-                        headers: buildHeaders(apiKeys[keyIndex]),
-                        body: JSON.stringify(requestBody),
+                        headers: request.headers,
+                        body: JSON.stringify(request.body),
                         signal
                     }, {
                         maxRetries,

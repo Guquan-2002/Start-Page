@@ -168,7 +168,12 @@
         <div id="chat-messages"></div>
 
         <div id="chat-input-area">
-            <textarea id="chat-input" placeholder="Type your message..." rows="1"></textarea>
+            <input type="file" id="chat-image-input" accept="image/*" multiple hidden>
+            <button id="chat-attach-btn" title="Attach images"><i class="fas fa-image"></i></button>
+            <div id="chat-input-stack">
+                <div id="chat-attachments"></div>
+                <textarea id="chat-input" placeholder="Type your message..." rows="1"></textarea>
+            </div>
             <button id="chat-stop-btn" title="Stop generation" style="display:none;"><i class="fas fa-stop"></i></button>
             <button id="chat-send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
         </div>

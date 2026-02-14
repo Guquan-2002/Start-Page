@@ -8,6 +8,7 @@
     const {
         messagesEl,
         chatInput,
+        attachBtn = null,
         sendBtn,
         stopBtn,
         sessionActionButtons = []
@@ -89,6 +90,28 @@
         return messageElement;
     }
 
+    function appendUserImageParts(messageElement, meta) {
+        const parts = Array.isArray(meta?.parts) ? meta.parts : [];
+        const imageParts = parts.filter((part) => part?.type === 'image' && typeof part?.image?.value === 'string');
+        if (imageParts.length === 0) {
+            return;
+        }
+
+        const imageList = document.createElement('div');
+        imageList.className = 'chat-user-images';
+
+        imageParts.forEach((part, index) => {
+            const image = document.createElement('img');
+            image.className = 'chat-user-image';
+            image.src = part.image.value;
+            image.alt = `uploaded-image-${index + 1}`;
+            image.loading = 'lazy';
+            imageList.appendChild(image);
+        });
+
+        messageElement.appendChild(imageList);
+    }
+
     function addMessage(role, text, meta = null, identifiers = {}) {
         const displayRole = typeof meta?.displayRole === 'string' ? meta.displayRole : role;
         const shouldShowRetry = role === 'user' && displayRole === 'user' && !meta?.isPrefixMessage;
@@ -99,6 +122,10 @@
             addCopyButtons(messageElement);
         } else {
             messageElement.textContent = text;
+        }
+
+        if (role === 'user' && displayRole === 'user') {
+            appendUserImageParts(messageElement, meta);
         }
 
         if (shouldShowRetry && identifiers?.turnId) {
@@ -220,6 +247,9 @@
 
     function setInputEnabled(enabled) {
         chatInput.disabled = !enabled;
+        if (attachBtn && 'disabled' in attachBtn) {
+            attachBtn.disabled = !enabled;
+        }
         sendBtn.disabled = !enabled;
     }
 
