@@ -1,4 +1,5 @@
-﻿import { CHAT_HISTORY_KEY } from '../constants.js';
+﻿// Session store: source of truth for chat sessions, messages, and streaming lifecycle state.
+import { CHAT_HISTORY_KEY } from '../constants.js';
 import {
     DEFAULT_SESSION_TITLE,
     buildSessionTitle,

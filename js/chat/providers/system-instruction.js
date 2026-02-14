@@ -1,3 +1,4 @@
+// System instruction builder: injects prompt rules and optional marker-splitting guidance.
 import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../constants.js';
 
 function buildMarkerInstruction(enableMarkerSplit) {

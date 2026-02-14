@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
     createOpenAiProvider,
     createOpenAiResponsesProvider
-} from '../../js/chat/providers/openai-provider.js';
+} from '../../js/chat/providers/vendors/openai-provider.js';
 import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../../js/chat/constants.js';
 
 function createOpenAiConfig(overrides = {}) {
@@ -331,3 +331,4 @@ test('openai responses provider appends responses path by default', async () => 
     assert.equal(requestUrl, 'https://api.openai.com/v1/responses');
     assert.deepEqual(result.segments, ['auto endpoint']);
 });
+

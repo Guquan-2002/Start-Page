@@ -1,3 +1,4 @@
+// Context window builder: trims and normalizes history to fit model token/message budgets.
 import { estimateTokenCount, getContextMessageContent, stripSourcesSection } from './message-model.js';
 import { getLocalMessageText, hasImageParts, normalizeLocalMessage } from './local-message.js';
 

@@ -1,3 +1,4 @@
+// Message model utilities: normalize, clone, tokenize, and segment chat messages.
 import {
     ASSISTANT_SEGMENT_MARKER,
     ASSISTANT_SENTENCE_MARKER,

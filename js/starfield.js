@@ -1,3 +1,4 @@
+// Starfield module: creates and animates background stars for the landing page.
 import { CONFIG } from './config.js';
 
 let canvas, ctx;

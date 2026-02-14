@@ -1,3 +1,4 @@
+// Provider format router: maps provider ids to request builder adapters.
 import { buildLocalMessageEnvelope } from '../core/local-message.js';
 import { CHAT_PROVIDER_IDS } from '../constants.js';
 import { buildOpenAiChatCompletionsRequest } from './adapters/openai-chat-completions.js';

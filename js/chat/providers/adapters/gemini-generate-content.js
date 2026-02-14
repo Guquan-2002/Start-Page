@@ -1,3 +1,4 @@
+// Gemini adapter: builds GenerateContent payloads from normalized local messages.
 import { parseImageDataUrl } from '../../core/local-message.js';
 
 function asTrimmedString(value) {

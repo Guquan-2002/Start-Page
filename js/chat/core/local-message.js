@@ -1,3 +1,4 @@
+// Local message normalization: converts mixed text/image payloads into a consistent shape.
 const LOCAL_MESSAGE_ROLES = new Set(['user', 'assistant']);
 const LOCAL_PART_TYPES = new Set(['text', 'image']);
 const IMAGE_SOURCE_TYPES = new Set(['url', 'data_url', 'base64', 'file_uri', 'file_id']);

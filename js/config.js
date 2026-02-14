@@ -1,8 +1,10 @@
-﻿import { safeGetJson, safeSetJson } from './shared/safe-storage.js';
+﻿// App-level runtime config for weather/network/search; merged from localStorage and optional global overrides.
+import { safeGetJson, safeSetJson } from './shared/safe-storage.js';
 
 const RUNTIME_CONFIG_STORAGE_KEY = 'startpage_config';
 const WEATHER_SETUP_PROMPT_FLAG_KEY = 'weather_setup_prompted_v1';
 
+// localStorage values are base config; window.__STARTPAGE_CONFIG__ can override per deployment.
 function readRuntimeConfig() {
     const globalConfig = globalThis.__STARTPAGE_CONFIG__ || {};
     const localConfig = safeGetJson(RUNTIME_CONFIG_STORAGE_KEY, {}, globalThis.localStorage);
@@ -47,6 +49,7 @@ export function markWeatherSetupPrompted() {
     }
 }
 
+// Prefer proxy endpoint when provided; otherwise call Seniverse directly with API key.
 function buildWeatherUrl(location) {
     if (weatherProxyUrl) {
         const separator = weatherProxyUrl.includes('?') ? '&' : '?';
@@ -141,3 +144,6 @@ export const SEARCH_ENGINES = {
         statusText: '断开'
     }
 };
+
+
+

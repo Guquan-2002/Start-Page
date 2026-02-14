@@ -1,37 +1,106 @@
-import { buildLocalMessageEnvelope } from '../core/local-message.js';
-import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { CHAT_PROVIDER_IDS } from '../constants.js';
-import { buildProviderRequest } from './format-router.js';
-import { buildSystemInstruction } from './system-instruction.js';
+// OpenAI provider client: supports Chat Completions/Responses APIs, retries, and streaming.
+import { buildLocalMessageEnvelope } from '../../core/local-message.js';
+import { splitAssistantMessageByMarker } from '../../core/message-model.js';
+import { CHAT_PROVIDER_IDS } from '../../constants.js';
+import { buildProviderRequest } from '../format-router.js';
+import { buildSystemInstruction } from '../system-instruction.js';
+
+const OPENAI_API_MODES = Object.freeze({
+    chatCompletions: 'chat-completions',
+    responses: 'responses'
+});
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
 }
 
-function parseAnthropicText(responseData) {
-    const blocks = Array.isArray(responseData?.content) ? responseData.content : [];
-    return blocks
-        .map((block) => (
-            block?.type === 'text' && typeof block?.text === 'string'
-                ? block.text
-                : ''
-        ))
+function extractTextFromContent(content) {
+    if (typeof content === 'string') {
+        return content;
+    }
+
+    if (Array.isArray(content)) {
+        return content
+            .map((item) => {
+                if (typeof item === 'string') {
+                    return item;
+                }
+
+                if (typeof item?.text === 'string') {
+                    return item.text;
+                }
+
+                if (typeof item?.content === 'string') {
+                    return item.content;
+                }
+
+                return '';
+            })
+            .filter(Boolean)
+            .join('');
+    }
+
+    return '';
+}
+
+function parseOpenAiText(responseData) {
+    const choices = Array.isArray(responseData?.choices) ? responseData.choices : [];
+    return choices
+        .map((choice) => extractTextFromContent(choice?.message?.content))
         .filter(Boolean)
         .join('');
 }
 
-function parseAnthropicStreamDelta(responseData) {
-    if (responseData?.type !== 'content_block_delta') {
-        return '';
+function parseOpenAiStreamDelta(responseData) {
+    const choices = Array.isArray(responseData?.choices) ? responseData.choices : [];
+    return choices
+        .map((choice) => extractTextFromContent(choice?.delta?.content))
+        .filter(Boolean)
+        .join('');
+}
+
+function parseOpenAiResponseText(responseData) {
+    if (typeof responseData?.output_text === 'string' && responseData.output_text) {
+        return responseData.output_text;
     }
 
-    if (responseData?.delta?.type !== 'text_delta') {
-        return '';
+    const outputItems = Array.isArray(responseData?.output) ? responseData.output : [];
+    return outputItems
+        .map((item) => {
+            if (typeof item?.text === 'string') {
+                return item.text;
+            }
+
+            const contentItems = Array.isArray(item?.content) ? item.content : [];
+            return contentItems
+                .map((contentItem) => {
+                    if (typeof contentItem?.text === 'string') {
+                        return contentItem.text;
+                    }
+
+                    if (typeof contentItem?.content === 'string') {
+                        return contentItem.content;
+                    }
+
+                    return '';
+                })
+                .filter(Boolean)
+                .join('');
+        })
+        .filter(Boolean)
+        .join('');
+}
+
+function parseOpenAiResponseStreamDelta(responseData) {
+    if (typeof responseData?.delta === 'string' && responseData.delta) {
+        return responseData.delta;
     }
 
-    return typeof responseData?.delta?.text === 'string'
-        ? responseData.delta.text
-        : '';
+    return '';
+}
+
+function isResponsesMode(apiMode) {
+    return apiMode === OPENAI_API_MODES.responses;
 }
 
 function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
@@ -60,7 +129,7 @@ async function readErrorDetails(response) {
         try {
             return await response.text();
         } catch {
-            return 'Unknown Anthropic API error';
+            return 'Unknown OpenAI API error';
         }
     }
 }
@@ -164,7 +233,7 @@ function extractSseDataPayload(rawEvent) {
 async function* readSseJsonEvents(response, signal) {
     const stream = response?.body;
     if (!stream || typeof stream.getReader !== 'function') {
-        throw new Error('Anthropic stream response body is empty.');
+        throw new Error('OpenAI stream response body is empty.');
     }
 
     const reader = stream.getReader();
@@ -197,6 +266,10 @@ async function* readSseJsonEvents(response, signal) {
                     continue;
                 }
 
+                if (rawData === '[DONE]') {
+                    return;
+                }
+
                 try {
                     yield JSON.parse(rawData);
                 } catch {
@@ -215,16 +288,24 @@ function buildApiKeys(config) {
         .filter(Boolean);
 }
 
-export function createAnthropicProvider({
+function createOpenAiProviderByMode({
+    providerId,
+    apiMode,
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
     maxRetryDelayMs = 8000
 } = {}) {
     if (typeof fetchImpl !== 'function') {
-        throw new Error('fetch implementation is required for Anthropic provider.');
+        throw new Error('fetch implementation is required for OpenAI provider.');
     }
 
-    const providerId = CHAT_PROVIDER_IDS.anthropic;
+    if (!providerId || typeof providerId !== 'string') {
+        throw new Error('OpenAI provider id is required.');
+    }
+
+    if (apiMode !== OPENAI_API_MODES.chatCompletions && apiMode !== OPENAI_API_MODES.responses) {
+        throw new Error('Unsupported OpenAI API mode.');
+    }
 
     return {
         id: providerId,
@@ -237,7 +318,7 @@ export function createAnthropicProvider({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('Anthropic model is required.');
+                throw new Error('OpenAI model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
@@ -282,7 +363,9 @@ export function createAnthropicProvider({
                     }
 
                     const responseData = await response.json();
-                    const assistantRawText = parseAnthropicText(responseData);
+                    const assistantRawText = isResponsesMode(apiMode)
+                        ? parseOpenAiResponseText(responseData)
+                        : parseOpenAiText(responseData);
 
                     return {
                         segments: splitAssistantMessageByMarker(assistantRawText, {
@@ -307,7 +390,7 @@ export function createAnthropicProvider({
                 }
             }
 
-            throw lastError || new Error('Anthropic request failed.');
+            throw lastError || new Error('OpenAI request failed.');
         },
 
         async *generateStream({
@@ -319,7 +402,7 @@ export function createAnthropicProvider({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('Anthropic model is required.');
+                throw new Error('OpenAI model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
@@ -365,7 +448,9 @@ export function createAnthropicProvider({
                     }
 
                     for await (const payload of readSseJsonEvents(response, signal)) {
-                        const deltaText = parseAnthropicStreamDelta(payload);
+                        const deltaText = isResponsesMode(apiMode)
+                            ? parseOpenAiResponseStreamDelta(payload)
+                            : parseOpenAiStreamDelta(payload);
                         if (!deltaText) {
                             continue;
                         }
@@ -399,7 +484,27 @@ export function createAnthropicProvider({
                 }
             }
 
-            throw lastError || new Error('Anthropic stream request failed.');
+            throw lastError || new Error('OpenAI stream request failed.');
         }
     };
 }
+
+export function createOpenAiProvider(options = {}) {
+    return createOpenAiProviderByMode({
+        ...options,
+        providerId: CHAT_PROVIDER_IDS.openai,
+        apiMode: OPENAI_API_MODES.chatCompletions
+    });
+}
+
+export function createOpenAiResponsesProvider(options = {}) {
+    return createOpenAiProviderByMode({
+        ...options,
+        providerId: CHAT_PROVIDER_IDS.openaiResponses,
+        apiMode: OPENAI_API_MODES.responses
+    });
+}
+
+
+
+

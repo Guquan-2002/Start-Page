@@ -1,4 +1,5 @@
-﻿import { CHAT_DRAFTS_KEY } from '../constants.js';
+﻿// Handles per-session draft persistence with schema checks and cleanup helpers.
+import { CHAT_DRAFTS_KEY } from '../constants.js';
 import { safeGetJson, safeSetJson } from '../../shared/safe-storage.js';
 
 const DRAFT_SCHEMA_VERSION = 1;
@@ -179,3 +180,4 @@ export function createDraftManager({
         getSnapshot
     };
 }
+

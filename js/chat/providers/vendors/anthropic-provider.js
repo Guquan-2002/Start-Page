@@ -1,23 +1,38 @@
-import { buildLocalMessageEnvelope } from '../core/local-message.js';
-import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { CHAT_PROVIDER_IDS } from '../constants.js';
-import { buildProviderRequest } from './format-router.js';
-import { buildSystemInstruction } from './system-instruction.js';
+// Anthropic provider client: handles retries, fallback keys, and SSE/non-SSE responses.
+import { buildLocalMessageEnvelope } from '../../core/local-message.js';
+import { splitAssistantMessageByMarker } from '../../core/message-model.js';
+import { CHAT_PROVIDER_IDS } from '../../constants.js';
+import { buildProviderRequest } from '../format-router.js';
+import { buildSystemInstruction } from '../system-instruction.js';
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
 }
 
-function parseGeminiText(responseData) {
-    const parts = responseData?.candidates?.[0]?.content?.parts;
-    if (!Array.isArray(parts)) {
+function parseAnthropicText(responseData) {
+    const blocks = Array.isArray(responseData?.content) ? responseData.content : [];
+    return blocks
+        .map((block) => (
+            block?.type === 'text' && typeof block?.text === 'string'
+                ? block.text
+                : ''
+        ))
+        .filter(Boolean)
+        .join('');
+}
+
+function parseAnthropicStreamDelta(responseData) {
+    if (responseData?.type !== 'content_block_delta') {
         return '';
     }
 
-    return parts
-        .map((part) => (typeof part?.text === 'string' ? part.text : ''))
-        .filter(Boolean)
-        .join('');
+    if (responseData?.delta?.type !== 'text_delta') {
+        return '';
+    }
+
+    return typeof responseData?.delta?.text === 'string'
+        ? responseData.delta.text
+        : '';
 }
 
 function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
@@ -37,7 +52,7 @@ function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, e
 async function readErrorDetails(response) {
     try {
         const errorPayload = await response.json();
-        if (errorPayload?.error?.message) {
+        if (typeof errorPayload?.error?.message === 'string' && errorPayload.error.message) {
             return errorPayload.error.message;
         }
 
@@ -46,7 +61,7 @@ async function readErrorDetails(response) {
         try {
             return await response.text();
         } catch {
-            return 'Unknown Gemini API error';
+            return 'Unknown Anthropic API error';
         }
     }
 }
@@ -150,7 +165,7 @@ function extractSseDataPayload(rawEvent) {
 async function* readSseJsonEvents(response, signal) {
     const stream = response?.body;
     if (!stream || typeof stream.getReader !== 'function') {
-        throw new Error('Gemini stream response body is empty.');
+        throw new Error('Anthropic stream response body is empty.');
     }
 
     const reader = stream.getReader();
@@ -178,70 +193,21 @@ async function* readSseJsonEvents(response, signal) {
 
                 const rawEvent = buffer.slice(0, delimiterMatch.index);
                 buffer = buffer.slice(delimiterMatch.index + delimiterMatch[0].length);
-
                 const rawData = extractSseDataPayload(rawEvent);
-                if (!rawData || rawData === '[DONE]') {
-                    if (rawData === '[DONE]') {
-                        return;
-                    }
+                if (!rawData) {
                     continue;
                 }
 
                 try {
                     yield JSON.parse(rawData);
                 } catch {
-                    // Ignore malformed SSE payloads.
+                    // Ignore malformed payload.
                 }
-            }
-        }
-
-        buffer += decoder.decode();
-        const residualData = extractSseDataPayload(buffer.trim());
-        if (residualData && residualData !== '[DONE]') {
-            try {
-                yield JSON.parse(residualData);
-            } catch {
-                // Ignore malformed residual payload.
             }
         }
     } finally {
         reader.releaseLock?.();
     }
-}
-
-function resolveStreamDelta(nextText, assembledText) {
-    if (!nextText) {
-        return {
-            deltaText: '',
-            mergedText: assembledText
-        };
-    }
-
-    if (!assembledText) {
-        return {
-            deltaText: nextText,
-            mergedText: nextText
-        };
-    }
-
-    if (nextText.startsWith(assembledText)) {
-        return {
-            deltaText: nextText.slice(assembledText.length),
-            mergedText: nextText
-        };
-    }
-
-    if (assembledText.startsWith(nextText) || assembledText.endsWith(nextText)) {
-        return {
-            deltaText: '',
-            mergedText: assembledText
-        };
-    }
-
-    return {
-        deltaText: nextText,
-        mergedText: `${assembledText}${nextText}`
-    };
 }
 
 function buildApiKeys(config) {
@@ -250,16 +216,16 @@ function buildApiKeys(config) {
         .filter(Boolean);
 }
 
-export function createGeminiProvider({
+export function createAnthropicProvider({
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
     maxRetryDelayMs = 8000
 } = {}) {
     if (typeof fetchImpl !== 'function') {
-        throw new Error('fetch implementation is required for Gemini provider.');
+        throw new Error('fetch implementation is required for Anthropic provider.');
     }
 
-    const providerId = CHAT_PROVIDER_IDS.gemini;
+    const providerId = CHAT_PROVIDER_IDS.anthropic;
 
     return {
         id: providerId,
@@ -272,12 +238,11 @@ export function createGeminiProvider({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('Gemini model is required.');
+                throw new Error('Anthropic model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
-
-            if (!apiKeys.length) {
+            if (apiKeys.length === 0) {
                 throw new Error('At least one API key is required.');
             }
 
@@ -318,7 +283,7 @@ export function createGeminiProvider({
                     }
 
                     const responseData = await response.json();
-                    const assistantRawText = parseGeminiText(responseData);
+                    const assistantRawText = parseAnthropicText(responseData);
 
                     return {
                         segments: splitAssistantMessageByMarker(assistantRawText, {
@@ -343,7 +308,7 @@ export function createGeminiProvider({
                 }
             }
 
-            throw lastError || new Error('Gemini request failed.');
+            throw lastError || new Error('Anthropic request failed.');
         },
 
         async *generateStream({
@@ -355,11 +320,11 @@ export function createGeminiProvider({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('Gemini model is required.');
+                throw new Error('Anthropic model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
-            if (!apiKeys.length) {
+            if (apiKeys.length === 0) {
                 throw new Error('At least one API key is required.');
             }
 
@@ -376,8 +341,6 @@ export function createGeminiProvider({
             let lastError = null;
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
-                let assembledText = '';
-
                 try {
                     const request = buildProviderRequest({
                         providerId,
@@ -403,18 +366,15 @@ export function createGeminiProvider({
                     }
 
                     for await (const payload of readSseJsonEvents(response, signal)) {
-                        const streamText = parseGeminiText(payload);
-                        const deltaResult = resolveStreamDelta(streamText, assembledText);
-                        assembledText = deltaResult.mergedText;
-
-                        if (!deltaResult.deltaText) {
+                        const deltaText = parseAnthropicStreamDelta(payload);
+                        if (!deltaText) {
                             continue;
                         }
 
                         emittedAnyDelta = true;
                         yield {
                             type: 'text-delta',
-                            text: deltaResult.deltaText
+                            text: deltaText
                         };
                     }
 
@@ -440,7 +400,11 @@ export function createGeminiProvider({
                 }
             }
 
-            throw lastError || new Error('Gemini stream request failed.');
+            throw lastError || new Error('Anthropic stream request failed.');
         }
     };
 }
+
+
+
+

@@ -56,13 +56,17 @@ home/
 |   |-- shared/
 |   |   `-- safe-storage.js
 |   `-- chat/
-|       |-- api.js
-|       |-- config.js
 |       |-- constants.js
-|       |-- custom-select.js
-|       |-- history.js
-|       |-- markdown.js
-|       |-- ui.js
+|       |-- app/
+|       |   |-- api-manager.js
+|       |   `-- config-manager.js
+|       |-- ui/
+|       |   |-- ui-manager.js
+|       |   |-- markdown.js
+|       |   `-- custom-select.js
+|       |-- session/
+|       |   |-- history-manager.js
+|       |   `-- session-store.js
 |       |-- core/
 |       |   |-- message-model.js
 |       |   |-- local-message.js
@@ -70,8 +74,6 @@ home/
 |       |   |-- context-window.js
 |       |   |-- prefix.js
 |       |   `-- pseudo-stream.js
-|       |-- state/
-|       |   `-- session-store.js
 |       |-- storage/
 |       |   |-- history-storage.js
 |       |   `-- draft-storage.js
@@ -80,9 +82,10 @@ home/
 |           |-- provider-router.js
 |           |-- format-router.js
 |           |-- system-instruction.js
-|           |-- gemini-provider.js
-|           |-- openai-provider.js
-|           |-- anthropic-provider.js
+|           |-- vendors/
+|           |   |-- gemini-provider.js
+|           |   |-- openai-provider.js
+|           |   `-- anthropic-provider.js
 |           `-- adapters/
 |               |-- gemini-generate-content.js
 |               |-- openai-chat-completions.js
@@ -190,6 +193,15 @@ Note: config is stored per provider. Switching provider restores that provider p
 - Request failures show an error bubble with a "Refill input" action
 - Retry on a user message rolls back by `turnId` (that turn and all later messages)
 - Session operations are blocked while generation is in progress
+
+## Chat Module Layers
+
+- `app/`: orchestration layer (config manager, request lifecycle, stream control)
+- `ui/`: presentation layer (message rendering, markdown safety, input controls)
+- `session/`: session domain layer (session state + history list operations)
+- `core/`: pure logic layer (message model, context window, splitter, pseudo-stream)
+- `providers/`: provider integration layer (provider clients + request adapters)
+- `storage/`: persistence layer (history/draft schema normalization and storage IO)
 
 ## Local Storage Keys
 

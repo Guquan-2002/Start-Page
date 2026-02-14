@@ -1,4 +1,5 @@
-﻿import { CHAT_SCHEMA_VERSION } from '../constants.js';
+﻿// Normalizes persisted chat history to the latest schema before app code consumes it.
+import { CHAT_SCHEMA_VERSION } from '../constants.js';
 import {
     DEFAULT_SESSION_TITLE,
     cloneChatMessages,
@@ -17,6 +18,7 @@ function createEmptyHistory() {
     };
 }
 
+// Older records may miss turnId/meta.turnId; infer them so retry/rollback logic stays reliable.
 function inferSessionTurnIds(messages) {
     let currentTurnId = '';
     const pendingPrefixIndexes = [];
@@ -181,3 +183,5 @@ export function saveChatHistory(storage, historyKey, history) {
     const normalizedHistory = normalizeHistory(history);
     return safeSetJson(historyKey, normalizedHistory, storage);
 }
+
+

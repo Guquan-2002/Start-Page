@@ -1,3 +1,4 @@
+// Network module: probes connectivity and tracks provider availability status.
 import { NETWORK_ENDPOINTS, SEARCH_ENGINES, CONFIG } from './config.js';
 import { elements, checkConnectivity } from './utils.js';
 

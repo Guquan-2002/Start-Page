@@ -1,105 +1,24 @@
-import { buildLocalMessageEnvelope } from '../core/local-message.js';
-import { splitAssistantMessageByMarker } from '../core/message-model.js';
-import { CHAT_PROVIDER_IDS } from '../constants.js';
-import { buildProviderRequest } from './format-router.js';
-import { buildSystemInstruction } from './system-instruction.js';
-
-const OPENAI_API_MODES = Object.freeze({
-    chatCompletions: 'chat-completions',
-    responses: 'responses'
-});
+// Gemini provider client: handles request building, retries, fallback keys, and streaming parse.
+import { buildLocalMessageEnvelope } from '../../core/local-message.js';
+import { splitAssistantMessageByMarker } from '../../core/message-model.js';
+import { CHAT_PROVIDER_IDS } from '../../constants.js';
+import { buildProviderRequest } from '../format-router.js';
+import { buildSystemInstruction } from '../system-instruction.js';
 
 function shouldRetryStatus(statusCode) {
     return statusCode === 408 || statusCode === 429 || statusCode >= 500;
 }
 
-function extractTextFromContent(content) {
-    if (typeof content === 'string') {
-        return content;
+function parseGeminiText(responseData) {
+    const parts = responseData?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) {
+        return '';
     }
 
-    if (Array.isArray(content)) {
-        return content
-            .map((item) => {
-                if (typeof item === 'string') {
-                    return item;
-                }
-
-                if (typeof item?.text === 'string') {
-                    return item.text;
-                }
-
-                if (typeof item?.content === 'string') {
-                    return item.content;
-                }
-
-                return '';
-            })
-            .filter(Boolean)
-            .join('');
-    }
-
-    return '';
-}
-
-function parseOpenAiText(responseData) {
-    const choices = Array.isArray(responseData?.choices) ? responseData.choices : [];
-    return choices
-        .map((choice) => extractTextFromContent(choice?.message?.content))
+    return parts
+        .map((part) => (typeof part?.text === 'string' ? part.text : ''))
         .filter(Boolean)
         .join('');
-}
-
-function parseOpenAiStreamDelta(responseData) {
-    const choices = Array.isArray(responseData?.choices) ? responseData.choices : [];
-    return choices
-        .map((choice) => extractTextFromContent(choice?.delta?.content))
-        .filter(Boolean)
-        .join('');
-}
-
-function parseOpenAiResponseText(responseData) {
-    if (typeof responseData?.output_text === 'string' && responseData.output_text) {
-        return responseData.output_text;
-    }
-
-    const outputItems = Array.isArray(responseData?.output) ? responseData.output : [];
-    return outputItems
-        .map((item) => {
-            if (typeof item?.text === 'string') {
-                return item.text;
-            }
-
-            const contentItems = Array.isArray(item?.content) ? item.content : [];
-            return contentItems
-                .map((contentItem) => {
-                    if (typeof contentItem?.text === 'string') {
-                        return contentItem.text;
-                    }
-
-                    if (typeof contentItem?.content === 'string') {
-                        return contentItem.content;
-                    }
-
-                    return '';
-                })
-                .filter(Boolean)
-                .join('');
-        })
-        .filter(Boolean)
-        .join('');
-}
-
-function parseOpenAiResponseStreamDelta(responseData) {
-    if (typeof responseData?.delta === 'string' && responseData.delta) {
-        return responseData.delta;
-    }
-
-    return '';
-}
-
-function isResponsesMode(apiMode) {
-    return apiMode === OPENAI_API_MODES.responses;
 }
 
 function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, enableMarkerSplit) {
@@ -119,7 +38,7 @@ function resolveRequestEnvelope(config, contextMessages, localMessageEnvelope, e
 async function readErrorDetails(response) {
     try {
         const errorPayload = await response.json();
-        if (typeof errorPayload?.error?.message === 'string' && errorPayload.error.message) {
+        if (errorPayload?.error?.message) {
             return errorPayload.error.message;
         }
 
@@ -128,7 +47,7 @@ async function readErrorDetails(response) {
         try {
             return await response.text();
         } catch {
-            return 'Unknown OpenAI API error';
+            return 'Unknown Gemini API error';
         }
     }
 }
@@ -232,7 +151,7 @@ function extractSseDataPayload(rawEvent) {
 async function* readSseJsonEvents(response, signal) {
     const stream = response?.body;
     if (!stream || typeof stream.getReader !== 'function') {
-        throw new Error('OpenAI stream response body is empty.');
+        throw new Error('Gemini stream response body is empty.');
     }
 
     const reader = stream.getReader();
@@ -260,25 +179,70 @@ async function* readSseJsonEvents(response, signal) {
 
                 const rawEvent = buffer.slice(0, delimiterMatch.index);
                 buffer = buffer.slice(delimiterMatch.index + delimiterMatch[0].length);
-                const rawData = extractSseDataPayload(rawEvent);
-                if (!rawData) {
-                    continue;
-                }
 
-                if (rawData === '[DONE]') {
-                    return;
+                const rawData = extractSseDataPayload(rawEvent);
+                if (!rawData || rawData === '[DONE]') {
+                    if (rawData === '[DONE]') {
+                        return;
+                    }
+                    continue;
                 }
 
                 try {
                     yield JSON.parse(rawData);
                 } catch {
-                    // Ignore malformed payload.
+                    // Ignore malformed SSE payloads.
                 }
+            }
+        }
+
+        buffer += decoder.decode();
+        const residualData = extractSseDataPayload(buffer.trim());
+        if (residualData && residualData !== '[DONE]') {
+            try {
+                yield JSON.parse(residualData);
+            } catch {
+                // Ignore malformed residual payload.
             }
         }
     } finally {
         reader.releaseLock?.();
     }
+}
+
+function resolveStreamDelta(nextText, assembledText) {
+    if (!nextText) {
+        return {
+            deltaText: '',
+            mergedText: assembledText
+        };
+    }
+
+    if (!assembledText) {
+        return {
+            deltaText: nextText,
+            mergedText: nextText
+        };
+    }
+
+    if (nextText.startsWith(assembledText)) {
+        return {
+            deltaText: nextText.slice(assembledText.length),
+            mergedText: nextText
+        };
+    }
+
+    if (assembledText.startsWith(nextText) || assembledText.endsWith(nextText)) {
+        return {
+            deltaText: '',
+            mergedText: assembledText
+        };
+    }
+
+    return {
+        deltaText: nextText,
+        mergedText: `${assembledText}${nextText}`
+    };
 }
 
 function buildApiKeys(config) {
@@ -287,24 +251,16 @@ function buildApiKeys(config) {
         .filter(Boolean);
 }
 
-function createOpenAiProviderByMode({
-    providerId,
-    apiMode,
+export function createGeminiProvider({
     fetchImpl = globalThis.fetch?.bind(globalThis),
     maxRetries = 3,
     maxRetryDelayMs = 8000
 } = {}) {
     if (typeof fetchImpl !== 'function') {
-        throw new Error('fetch implementation is required for OpenAI provider.');
+        throw new Error('fetch implementation is required for Gemini provider.');
     }
 
-    if (!providerId || typeof providerId !== 'string') {
-        throw new Error('OpenAI provider id is required.');
-    }
-
-    if (apiMode !== OPENAI_API_MODES.chatCompletions && apiMode !== OPENAI_API_MODES.responses) {
-        throw new Error('Unsupported OpenAI API mode.');
-    }
+    const providerId = CHAT_PROVIDER_IDS.gemini;
 
     return {
         id: providerId,
@@ -317,11 +273,12 @@ function createOpenAiProviderByMode({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('OpenAI model is required.');
+                throw new Error('Gemini model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
-            if (apiKeys.length === 0) {
+
+            if (!apiKeys.length) {
                 throw new Error('At least one API key is required.');
             }
 
@@ -362,9 +319,7 @@ function createOpenAiProviderByMode({
                     }
 
                     const responseData = await response.json();
-                    const assistantRawText = isResponsesMode(apiMode)
-                        ? parseOpenAiResponseText(responseData)
-                        : parseOpenAiText(responseData);
+                    const assistantRawText = parseGeminiText(responseData);
 
                     return {
                         segments: splitAssistantMessageByMarker(assistantRawText, {
@@ -389,7 +344,7 @@ function createOpenAiProviderByMode({
                 }
             }
 
-            throw lastError || new Error('OpenAI request failed.');
+            throw lastError || new Error('Gemini request failed.');
         },
 
         async *generateStream({
@@ -401,11 +356,11 @@ function createOpenAiProviderByMode({
             onFallbackKey
         }) {
             if (!config?.model) {
-                throw new Error('OpenAI model is required.');
+                throw new Error('Gemini model is required.');
             }
 
             const apiKeys = buildApiKeys(config);
-            if (apiKeys.length === 0) {
+            if (!apiKeys.length) {
                 throw new Error('At least one API key is required.');
             }
 
@@ -422,6 +377,8 @@ function createOpenAiProviderByMode({
             let lastError = null;
 
             for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
+                let assembledText = '';
+
                 try {
                     const request = buildProviderRequest({
                         providerId,
@@ -447,17 +404,18 @@ function createOpenAiProviderByMode({
                     }
 
                     for await (const payload of readSseJsonEvents(response, signal)) {
-                        const deltaText = isResponsesMode(apiMode)
-                            ? parseOpenAiResponseStreamDelta(payload)
-                            : parseOpenAiStreamDelta(payload);
-                        if (!deltaText) {
+                        const streamText = parseGeminiText(payload);
+                        const deltaResult = resolveStreamDelta(streamText, assembledText);
+                        assembledText = deltaResult.mergedText;
+
+                        if (!deltaResult.deltaText) {
                             continue;
                         }
 
                         emittedAnyDelta = true;
                         yield {
                             type: 'text-delta',
-                            text: deltaText
+                            text: deltaResult.deltaText
                         };
                     }
 
@@ -483,23 +441,11 @@ function createOpenAiProviderByMode({
                 }
             }
 
-            throw lastError || new Error('OpenAI stream request failed.');
+            throw lastError || new Error('Gemini stream request failed.');
         }
     };
 }
 
-export function createOpenAiProvider(options = {}) {
-    return createOpenAiProviderByMode({
-        ...options,
-        providerId: CHAT_PROVIDER_IDS.openai,
-        apiMode: OPENAI_API_MODES.chatCompletions
-    });
-}
 
-export function createOpenAiResponsesProvider(options = {}) {
-    return createOpenAiProviderByMode({
-        ...options,
-        providerId: CHAT_PROVIDER_IDS.openaiResponses,
-        apiMode: OPENAI_API_MODES.responses
-    });
-}
+
+

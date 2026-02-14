@@ -1,3 +1,4 @@
+// OpenAI Responses adapter: builds Responses API payloads from normalized local messages.
 function asTrimmedString(value) {
     return typeof value === 'string' ? value.trim() : '';
 }

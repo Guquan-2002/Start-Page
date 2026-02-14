@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createGeminiProvider } from '../../js/chat/providers/gemini-provider.js';
+import { createGeminiProvider } from '../../js/chat/providers/vendors/gemini-provider.js';
 import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../../js/chat/constants.js';
 
 function createGeminiConfig(overrides = {}) {
@@ -173,3 +173,4 @@ test('gemini provider stream does not switch backup key after first delta', asyn
 
     assert.deepEqual(apiKeys, ['primary-key']);
 });
+

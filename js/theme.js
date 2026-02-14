@@ -1,3 +1,4 @@
+// Theme module: switches day/night classes and keeps UI theme in sync with time.
 import { elements } from './utils.js';
 
 export function updateBackground() {

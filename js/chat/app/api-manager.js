@@ -1,10 +1,11 @@
-﻿import { buildContextPreview, buildLocalMessageEnvelope, normalizeMaxContextMessages } from './core/context-window.js';
-import { createChatMessage, createTurnId, getMessageDisplayContent } from './core/message-model.js';
-import { createMarkerStreamSplitter } from './core/marker-stream-splitter.js';
-import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from './core/prefix.js';
-import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from './constants.js';
-import { runPseudoStream } from './core/pseudo-stream.js';
-import { assertProvider } from './providers/provider-interface.js';
+// Chat API manager: orchestrates send/stream/abort flows between UI, state, and providers.
+import { buildContextPreview, buildLocalMessageEnvelope, normalizeMaxContextMessages } from '../core/context-window.js';
+import { createChatMessage, createTurnId, getMessageDisplayContent } from '../core/message-model.js';
+import { createMarkerStreamSplitter } from '../core/marker-stream-splitter.js';
+import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from '../core/prefix.js';
+import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../constants.js';
+import { runPseudoStream } from '../core/pseudo-stream.js';
+import { assertProvider } from '../providers/provider-interface.js';
 
 const CONTEXT_DEBUG_STORAGE_KEY = 'llm_chat_context_debug';
 const CONTEXT_MAX_MESSAGES_STORAGE_KEY = 'llm_chat_context_max_messages';
@@ -83,7 +84,7 @@ function fileToDataUrl(file) {
 }
 
 function formatAttachmentNotice(count) {
-    return count === 1 ? '已附加 1 张图片' : `已附加 ${count} 张图片`;
+    return count === 1 ? '�Ѹ��� 1 ��ͼƬ' : `�Ѹ��� ${count} ��ͼƬ`;
 }
 
 export function createApiManager({
@@ -194,7 +195,7 @@ export function createApiManager({
             const removeBtn = document.createElement('button');
             removeBtn.type = 'button';
             removeBtn.className = 'chat-attachment-remove';
-            removeBtn.textContent = '×';
+            removeBtn.textContent = '��';
             removeBtn.title = 'Remove image';
             removeBtn.addEventListener('click', () => {
                 pendingImageParts = pendingImageParts.filter((_, i) => i !== index);
@@ -260,7 +261,7 @@ export function createApiManager({
         ui.addErrorMessage({
             title,
             detail,
-            actionLabel: failedInputText ? '回填输入框' : '',
+            actionLabel: failedInputText ? '���������' : '',
             onAction: failedInputText
                 ? () => refillFailedInput(failedInputText)
                 : null
@@ -679,3 +680,6 @@ export function createApiManager({
         stopGeneration
     };
 }
+
+
+

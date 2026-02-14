@@ -56,13 +56,17 @@ home/
 |   |-- shared/
 |   |   `-- safe-storage.js
 |   `-- chat/
-|       |-- api.js
-|       |-- config.js
 |       |-- constants.js
-|       |-- custom-select.js
-|       |-- history.js
-|       |-- markdown.js
-|       |-- ui.js
+|       |-- app/
+|       |   |-- api-manager.js
+|       |   `-- config-manager.js
+|       |-- ui/
+|       |   |-- ui-manager.js
+|       |   |-- markdown.js
+|       |   `-- custom-select.js
+|       |-- session/
+|       |   |-- history-manager.js
+|       |   `-- session-store.js
 |       |-- core/
 |       |   |-- message-model.js
 |       |   |-- local-message.js
@@ -70,8 +74,6 @@ home/
 |       |   |-- context-window.js
 |       |   |-- prefix.js
 |       |   `-- pseudo-stream.js
-|       |-- state/
-|       |   `-- session-store.js
 |       |-- storage/
 |       |   |-- history-storage.js
 |       |   `-- draft-storage.js
@@ -80,9 +82,10 @@ home/
 |           |-- provider-router.js
 |           |-- format-router.js
 |           |-- system-instruction.js
-|           |-- gemini-provider.js
-|           |-- openai-provider.js
-|           |-- anthropic-provider.js
+|           |-- vendors/
+|           |   |-- gemini-provider.js
+|           |   |-- openai-provider.js
+|           |   `-- anthropic-provider.js
 |           `-- adapters/
 |               |-- gemini-generate-content.js
 |               |-- openai-chat-completions.js
@@ -191,6 +194,15 @@ localStorage.setItem('startpage_config', JSON.stringify({
 - 请求失败时显示错误气泡，支持“回填输入框”
 - 点击用户消息重试按钮会按 `turnId` 回退该轮及其后续消息
 - 生成中会阻止切会话/新建/清空等操作（避免状态错乱）
+
+## Chat 模块分层
+
+- `app/`：编排层（配置管理、请求发送、流式控制）
+- `ui/`：视图层（消息渲染、Markdown、安全展示、交互控件）
+- `session/`：会话层（会话状态与历史列表操作）
+- `core/`：纯逻辑层（消息模型、上下文窗口、分段器、伪流式等）
+- `providers/`：模型适配层（各 Provider 客户端 + 请求格式适配）
+- `storage/`：持久化层（历史与草稿 schema/读写）
 
 ## 本地存储键
 

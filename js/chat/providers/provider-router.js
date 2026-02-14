@@ -1,3 +1,4 @@
+// Provider router: selects the active provider implementation from current chat config.
 function normalizeProviderId(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }

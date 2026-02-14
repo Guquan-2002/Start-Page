@@ -1,4 +1,5 @@
-﻿import {
+﻿// Weather module: fetches weather data, maps icons, and updates the weather widget.
+import {
     WEATHER_API_URLS,
     WEATHER_ICON_MAP,
     CONFIG,

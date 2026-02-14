@@ -1,9 +1,10 @@
-﻿import {
+﻿// Chat settings manager: keeps provider-specific profiles in sync with the form + localStorage.
+import {
     CHAT_DEFAULTS,
     CHAT_PROVIDER_IDS,
     getProviderDefaults
-} from './constants.js';
-import { safeGetJson, safeSetJson } from '../shared/safe-storage.js';
+} from '../constants.js';
+import { safeGetJson, safeSetJson } from '../../shared/safe-storage.js';
 
 const SUPPORTED_PROVIDER_IDS = Object.values(CHAT_PROVIDER_IDS);
 const OPENAI_REASONING_LEVELS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
@@ -127,6 +128,7 @@ function readRawProfiles(raw) {
     return {};
 }
 
+// Accept both new and legacy payload shapes, then build a normalized runtime config.
 function normalizeStoredConfig(raw) {
     const provider = normalizeProvider(raw?.provider);
     const rawProfiles = readRawProfiles(raw);
@@ -261,7 +263,8 @@ export function createConfigManager(elements, storageKey) {
         }
     }
 
-    function switchProvider(nextProviderRaw, { dispatchSearchChange = true } = {}) {
+    // Persist current provider form values before switching to another provider profile.
+function switchProvider(nextProviderRaw, { dispatchSearchChange = true } = {}) {
         const nextProvider = normalizeProvider(nextProviderRaw);
         if (nextProvider === activeProvider) {
             return;
@@ -359,3 +362,8 @@ export function createConfigManager(elements, storageKey) {
         getConfig
     };
 }
+
+
+
+
+

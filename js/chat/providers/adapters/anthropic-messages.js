@@ -1,3 +1,4 @@
+// Anthropic adapter: builds Anthropic Messages API payloads from normalized local messages.
 import { parseImageDataUrl } from '../../core/local-message.js';
 
 const ANTHROPIC_API_VERSION = '2023-06-01';

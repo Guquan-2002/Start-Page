@@ -1,4 +1,5 @@
-﻿export const CHAT_STORAGE_KEY = 'llm_chat_config';
+﻿// Shared chat constants: storage keys, provider ids, defaults, and runtime limits.
+export const CHAT_STORAGE_KEY = 'llm_chat_config';
 export const CHAT_HISTORY_KEY = 'llm_chat_history_v2';
 export const CHAT_DRAFTS_KEY = 'llm_chat_drafts_v1';
 export const CHAT_SCHEMA_VERSION = 3;

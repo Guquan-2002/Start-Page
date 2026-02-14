@@ -1,4 +1,5 @@
-﻿function formatPrefixTimestamp(timestamp) {
+﻿// Message prefix helpers: build optional user-name and timestamp prefixes.
+function formatPrefixTimestamp(timestamp) {
     const date = new Date(timestamp);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

@@ -1,3 +1,4 @@
+// Application entrypoint: initializes all page modules after DOM is ready.
 import { CONFIG } from './config.js';
 import { initElements } from './utils.js';
 import { startTimeClock } from './time.js';

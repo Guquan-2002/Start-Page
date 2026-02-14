@@ -1,3 +1,4 @@
+// Markdown renderer: sanitizes and renders assistant markdown safely.
 const MARKDOWN_ALLOWED_TAGS = new Set([
     'a', 'blockquote', 'br', 'code', 'del', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
     'hr', 'li', 'ol', 'p', 'pre', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul', 'span'

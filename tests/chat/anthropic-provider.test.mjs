@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createAnthropicProvider } from '../../js/chat/providers/anthropic-provider.js';
+import { createAnthropicProvider } from '../../js/chat/providers/vendors/anthropic-provider.js';
 import { ASSISTANT_SEGMENT_MARKER, ASSISTANT_SENTENCE_MARKER } from '../../js/chat/constants.js';
 
 function createAnthropicConfig(overrides = {}) {
@@ -218,3 +218,4 @@ test('anthropic provider stream does not switch to backup key after first delta'
 
     assert.deepEqual(apiKeys, ['primary-key']);
 });
+

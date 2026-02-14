@@ -1,7 +1,7 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createSessionStore } from '../../js/chat/state/session-store.js';
+import { createSessionStore } from '../../js/chat/session/session-store.js';
 import { createChatMessage } from '../../js/chat/core/message-model.js';
 
 function createMemoryStorage() {
@@ -134,3 +134,4 @@ test('streaming state transitions remain valid for orchestration flow', () => {
     assert.equal(store.isStreaming(), false);
     assert.equal(store.getAbortController(), null);
 });
+

@@ -1,4 +1,6 @@
-﻿function isStorageLike(storage) {
+﻿// Shared helpers for resilient localStorage access.
+// These wrappers avoid throwing when storage is unavailable or JSON is malformed.
+function isStorageLike(storage) {
     return Boolean(storage)
         && typeof storage.getItem === 'function'
         && typeof storage.setItem === 'function';
@@ -61,3 +63,4 @@ export function safeRemoveItem(key, storage = null) {
         return false;
     }
 }
+

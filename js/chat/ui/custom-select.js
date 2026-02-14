@@ -1,3 +1,4 @@
+// Custom select UI: replaces native select with keyboard/mouse friendly controls.
 export function initCustomSelect(selectEl) {
     if (!selectEl || selectEl.dataset.customSelectReady === '1') {
         return null;

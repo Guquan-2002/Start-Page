@@ -1,3 +1,4 @@
+// Time module: updates the on-screen clock/date with locale-aware formatting.
 import { elements } from './utils.js';
 
 export function updateTime() {

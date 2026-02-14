@@ -1,4 +1,5 @@
-﻿const SENTENCE_PUNCTUATION_REGEX = /[。！？!?]/u;
+﻿// Pseudo stream helpers: split full text into incremental chunks for typing-like rendering.
+const SENTENCE_PUNCTUATION_REGEX = /[。！？!?]/u;
 const CLAUSE_PUNCTUATION_REGEX = /[，,；;：:]/u;
 const BOUNDARY_REGEX = /[\s\n\r\t]/u;
 

@@ -1,4 +1,5 @@
-﻿export function createHistoryManager({
+﻿// Session history manager: binds session list UI actions to store operations.
+export function createHistoryManager({
     store,
     elements,
     onSessionActivated,

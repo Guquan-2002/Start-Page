@@ -1,4 +1,5 @@
-﻿import { $ } from './utils.js';
+// Chat bootstrap: wires chat UI, state, providers, config, and event handlers.
+import { $ } from './utils.js';
 import {
     CHAT_DRAFTS_KEY,
     CHAT_HISTORY_KEY,
@@ -6,20 +7,20 @@ import {
     CHAT_STORAGE_KEY,
     CHAT_PROVIDER_IDS
 } from './chat/constants.js';
-import { createConfigManager } from './chat/config.js';
-import { setupMarked, renderMarkdown } from './chat/markdown.js';
-import { createUiManager } from './chat/ui.js';
-import { createHistoryManager } from './chat/history.js';
-import { createApiManager } from './chat/api.js';
-import { initCustomSelect } from './chat/custom-select.js';
-import { createSessionStore } from './chat/state/session-store.js';
+import { createConfigManager } from './chat/app/config-manager.js';
+import { setupMarked, renderMarkdown } from './chat/ui/markdown.js';
+import { createUiManager } from './chat/ui/ui-manager.js';
+import { createHistoryManager } from './chat/session/history-manager.js';
+import { createApiManager } from './chat/app/api-manager.js';
+import { initCustomSelect } from './chat/ui/custom-select.js';
+import { createSessionStore } from './chat/session/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
-import { createGeminiProvider } from './chat/providers/gemini-provider.js';
+import { createGeminiProvider } from './chat/providers/vendors/gemini-provider.js';
 import {
     createOpenAiProvider,
     createOpenAiResponsesProvider
-} from './chat/providers/openai-provider.js';
-import { createAnthropicProvider } from './chat/providers/anthropic-provider.js';
+} from './chat/providers/vendors/openai-provider.js';
+import { createAnthropicProvider } from './chat/providers/vendors/anthropic-provider.js';
 import { createProviderRouter } from './chat/providers/provider-router.js';
 import { createDraftManager } from './chat/storage/draft-storage.js';
 
@@ -492,3 +493,13 @@ export function initChat() {
     restoreDraftForActiveSession();
     historyManager.renderHistoryList();
 }
+
+
+
+
+
+
+
+
+
+

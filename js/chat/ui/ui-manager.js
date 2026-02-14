@@ -1,4 +1,5 @@
-﻿export function createUiManager({
+﻿// Chat UI manager: renders messages and controls chat interaction states.
+export function createUiManager({
     elements,
     renderMarkdown,
     maxRenderedMessages,

@@ -1,3 +1,4 @@
+// Stream splitter: separates streamed text by configured assistant segment markers.
 function normalizeMarkers(markers) {
     if (!Array.isArray(markers)) {
         return [];

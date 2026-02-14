@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createConfigManager } from '../../js/chat/config.js';
+import { createConfigManager } from '../../js/chat/app/config-manager.js';
 
 function createMemoryStorage() {
     const map = new Map();
@@ -203,3 +203,4 @@ test('config manager keeps provider specific credentials and models when switchi
     assert.equal(saved.profiles.anthropic.thinkingBudget, 2048);
     assert.equal(saved.profiles.anthropic.searchMode, 'anthropic_web_search');
 });
+

@@ -1,3 +1,4 @@
+// OpenAI Chat Completions adapter: builds chat/completions payloads from local messages.
 function asTrimmedString(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
