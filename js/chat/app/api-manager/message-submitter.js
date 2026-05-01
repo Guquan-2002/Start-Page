@@ -8,6 +8,7 @@
  */
 import { createChatMessage, createTurnId, getMessageDisplayContent } from '../../core/message-model.js';
 import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from '../../core/prefix.js';
+import { getProviderLabel } from '../../providers/provider-registry.js';
 import { formatAttachmentNotice } from './attachments.js';
 
 function resizeInputToContent(chatInput) {
@@ -54,14 +55,7 @@ export function createMessageSubmitter({
         }
 
         const config = configManager.getConfig();
-        const providerLabelMap = {
-            gemini: 'Gemini',
-            openai: 'OpenAI Chat Completions',
-            openai_responses: 'OpenAI Responses',
-            ark_responses: 'Volcengine Ark Responses',
-            anthropic: 'Anthropic'
-        };
-        const providerLabel = providerLabelMap[config.provider] || 'provider';
+        const providerLabel = getProviderLabel(config.provider);
 
         if (!config.apiKey && !config.backupApiKey) {
             ui.addMessage('error', `Please set at least one ${providerLabel} API key in settings.`);
@@ -161,4 +155,3 @@ export function createMessageSubmitter({
         sendMessage
     };
 }
-

@@ -228,7 +228,7 @@ test('anthropic provider maps thinking effort and web search format', async () =
         config: createAnthropicConfig({
             backupApiKey: '',
             thinkingEffort: 'medium',
-            searchMode: 'anthropic_web_search'
+            searchEnabled: true
         }),
         contextMessages,
         signal: new AbortController().signal
@@ -254,7 +254,7 @@ test('anthropic provider maps thinking effort and web search format', async () =
     }]);
 });
 
-test('anthropic provider omits web search tools when search mode is disabled', async () => {
+test('anthropic provider omits web search tools when search is disabled', async () => {
     let requestBody = null;
     const fetchMock = async (_url, options) => {
         requestBody = JSON.parse(options.body);
@@ -270,7 +270,7 @@ test('anthropic provider omits web search tools when search mode is disabled', a
     await provider.generate({
         config: createAnthropicConfig({
             backupApiKey: '',
-            searchMode: ''
+            searchEnabled: false
         }),
         contextMessages,
         signal: new AbortController().signal

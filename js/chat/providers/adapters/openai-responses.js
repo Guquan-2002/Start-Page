@@ -4,7 +4,7 @@
  * 职责：
  * - 将标准化的本地消息格式转换为 OpenAI Responses API 的请求格式
  * - 处理图片的多种来源类型（url、data_url、base64、file_id）
- * - 支持 Reasoning Effort 和 Web Search 功能
+ * - 支持 Reasoning Effort 功能
  * - 构建完整的 API 请求对象（endpoint、headers、body）
  *
  * 依赖：无
@@ -179,16 +179,6 @@ export function buildOpenAiResponsesRequest({
         body.reasoning = {
             effort: config.thinkingBudget
         };
-    }
-
-    // 添加 Web Search 工具
-    if (
-        typeof config?.searchMode === 'string'
-        && (config.searchMode === 'openai_web_search' || config.searchMode.startsWith('openai_web_search_'))
-    ) {
-        body.tools = [{
-            type: 'web_search'
-        }];
     }
 
     return {

@@ -12,7 +12,7 @@ function createBaseConfig(overrides = {}) {
         thinkingBudget: null,
         thinkingLevel: null,
         thinkingEffort: null,
-        searchMode: '',
+        searchEnabled: false,
         ...overrides
     };
 }
@@ -25,7 +25,7 @@ test('format router builds OpenAI chat completions request for text+image messag
             apiUrl: 'https://api.openai.com/v1',
             model: 'gpt-4o-mini',
             thinkingBudget: 'high',
-            searchMode: 'openai_web_search'
+            searchEnabled: true
         }),
         envelope: {
             systemInstruction: 'You are helpful.',
@@ -72,7 +72,7 @@ test('format router builds OpenAI responses request with input_text + input_imag
             provider: CHAT_PROVIDER_IDS.openaiResponses,
             apiUrl: 'https://api.openai.com/v1',
             model: 'gpt-4o-mini',
-            searchMode: 'openai_web_search'
+            searchEnabled: true
         }),
         envelope: {
             systemInstruction: 'System prompt',
@@ -188,7 +188,7 @@ test('format router builds Ark responses request with thinking + web search', ()
             apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
             model: 'doubao-seed-2-0-pro-260215',
             thinkingBudget: 'medium',
-            searchMode: 'ark_web_search'
+            searchEnabled: true
         }),
         envelope: {
             systemInstruction: 'Ark system',
@@ -231,6 +231,67 @@ test('format router builds Ark responses request with thinking + web search', ()
     });
 });
 
+test('format router builds DeepSeek chat completions request with thinking enabled and no native search payload', () => {
+    const request = buildProviderRequest({
+        providerId: CHAT_PROVIDER_IDS.deepseek,
+        config: createBaseConfig({
+            provider: CHAT_PROVIDER_IDS.deepseek,
+            apiUrl: 'https://api.deepseek.com',
+            model: 'deepseek-v4-flash',
+            thinkingBudget: 'max',
+            searchEnabled: true
+        }),
+        envelope: {
+            systemInstruction: 'DeepSeek system',
+            messages: [{
+                role: 'user',
+                parts: [{ type: 'text', text: 'hello' }]
+            }]
+        },
+        stream: true,
+        apiKey: 'sk-deepseek'
+    });
+
+    assert.equal(request.endpoint, 'https://api.deepseek.com/chat/completions');
+    assert.equal(request.headers.Authorization, 'Bearer sk-deepseek');
+    assert.equal(request.body.stream, true);
+    assert.deepEqual(request.body.thinking, {
+        type: 'enabled'
+    });
+    assert.equal(request.body.reasoning_effort, 'max');
+    assert.equal(request.body.web_search_options, undefined);
+    assert.equal(request.body.tools, undefined);
+    assert.deepEqual(request.body.messages, [
+        { role: 'system', content: 'DeepSeek system' },
+        { role: 'user', content: 'hello' }
+    ]);
+});
+
+test('format router builds DeepSeek chat completions request with thinking disabled', () => {
+    const request = buildProviderRequest({
+        providerId: CHAT_PROVIDER_IDS.deepseek,
+        config: createBaseConfig({
+            provider: CHAT_PROVIDER_IDS.deepseek,
+            apiUrl: 'https://api.deepseek.com',
+            model: 'deepseek-v4-pro',
+            thinkingBudget: 'disabled'
+        }),
+        envelope: {
+            messages: [{
+                role: 'user',
+                parts: [{ type: 'text', text: 'hello' }]
+            }]
+        },
+        stream: false,
+        apiKey: 'sk-deepseek'
+    });
+
+    assert.deepEqual(request.body.thinking, {
+        type: 'disabled'
+    });
+    assert.equal(request.body.reasoning_effort, undefined);
+});
+
 test('format router builds Anthropic request with top-level system and base64 image source', () => {
     const request = buildProviderRequest({
         providerId: CHAT_PROVIDER_IDS.anthropic,
@@ -239,7 +300,7 @@ test('format router builds Anthropic request with top-level system and base64 im
             apiUrl: 'https://api.anthropic.com/v1',
             model: 'claude-sonnet-4-5-20250929',
             thinkingEffort: 'medium',
-            searchMode: 'anthropic_web_search'
+            searchEnabled: true
         }),
         envelope: {
             systemInstruction: 'Anthropic system',
@@ -313,7 +374,7 @@ test('format router builds Gemini request with inline_data and file_data parts',
             provider: CHAT_PROVIDER_IDS.gemini,
             apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
             model: 'gemini-2.5-pro',
-            searchMode: 'gemini_google_search',
+            searchEnabled: true,
             thinkingLevel: 'high'
         }),
         envelope: {

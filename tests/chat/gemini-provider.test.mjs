@@ -12,7 +12,7 @@ function createGeminiConfig(overrides = {}) {
         backupApiKey: 'backup-key',
         model: 'gemini-2.5-pro',
         systemPrompt: 'You are a helpful assistant.',
-        searchMode: '',
+        searchEnabled: false,
         thinkingLevel: null,
         enablePseudoStream: true,
         ...overrides

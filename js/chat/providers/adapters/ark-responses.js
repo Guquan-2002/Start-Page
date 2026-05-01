@@ -113,12 +113,6 @@ export function buildArkResponsesRequest({
         };
     }
 
-    if (config?.searchMode === 'ark_web_search') {
-        body.tools = [{
-            type: 'web_search'
-        }];
-    }
-
     return {
         endpoint,
         headers: {

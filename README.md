@@ -40,14 +40,11 @@
 ### 本地服务
 
 ```bash
-# Python
-python -m http.server 8000
-
 # Node.js
-npx serve
+npm start
 ```
 
-访问 `http://localhost:8000`
+访问 `http://localhost:7121`
 
 ### 运行测试
 

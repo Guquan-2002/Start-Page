@@ -171,7 +171,7 @@ test('openai provider maps reasoning effort and basic web search format', async 
         config: createOpenAiConfig({
             backupApiKey: '',
             thinkingBudget: 'high',
-            searchMode: 'openai_web_search'
+            searchEnabled: true
         }),
         contextMessages,
         signal: new AbortController().signal

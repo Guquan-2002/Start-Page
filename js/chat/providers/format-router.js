@@ -8,34 +8,34 @@
  *
  * 依赖：
  * - local-message.js（消息封装构建）
- * - constants.js（Provider ID 常量）
+ * - provider-registry.js（Provider ID 和搜索工具规则）
  * - adapters/*（各 Provider 的请求构建器）
  *
  * 被依赖：anthropic-provider, gemini-provider, openai-provider
  */
 import { buildLocalMessageEnvelope } from '../core/local-message.js';
-import { CHAT_PROVIDER_IDS } from '../constants.js';
 import { buildOpenAiChatCompletionsRequest } from './adapters/openai-chat-completions.js';
 import { buildOpenAiResponsesRequest } from './adapters/openai-responses.js';
+import { buildDeepSeekChatCompletionsRequest } from './adapters/deepseek-chat-completions.js';
 import { buildArkResponsesRequest } from './adapters/ark-responses.js';
 import { buildAnthropicMessagesRequest } from './adapters/anthropic-messages.js';
 import { buildGeminiGenerateContentRequest } from './adapters/gemini-generate-content.js';
+import {
+    CHAT_PROVIDER_IDS,
+    applyProviderSearchConfig,
+    getProviderDefinition,
+    normalizeProviderId
+} from './provider-registry.js';
 
 // Provider ID 到请求构建器的映射表
 const REQUEST_BUILDERS = new Map([
     [CHAT_PROVIDER_IDS.openai, buildOpenAiChatCompletionsRequest],
     [CHAT_PROVIDER_IDS.openaiResponses, buildOpenAiResponsesRequest],
+    [CHAT_PROVIDER_IDS.deepseek, buildDeepSeekChatCompletionsRequest],
     [CHAT_PROVIDER_IDS.arkResponses, buildArkResponsesRequest],
     [CHAT_PROVIDER_IDS.anthropic, buildAnthropicMessagesRequest],
     [CHAT_PROVIDER_IDS.gemini, buildGeminiGenerateContentRequest]
 ]);
-
-/**
- * 规范化 Provider ID
- */
-function normalizeProviderId(providerId) {
-    return typeof providerId === 'string' ? providerId.trim().toLowerCase() : '';
-}
 
 /**
  * 构建 Provider 请求对象
@@ -62,19 +62,28 @@ export function buildProviderRequest({
     apiKey
 }) {
     const normalizedProviderId = normalizeProviderId(providerId || config?.provider);
-    const requestBuilder = REQUEST_BUILDERS.get(normalizedProviderId);
-    if (!requestBuilder) {
+    const providerDefinition = getProviderDefinition(normalizedProviderId);
+    if (!providerDefinition) {
         throw new Error(`Unsupported provider "${providerId}".`);
+    }
+
+    const requestBuilder = REQUEST_BUILDERS.get(providerDefinition.id);
+    if (!requestBuilder) {
+        throw new Error(`Provider "${providerDefinition.id}" does not have a request builder.`);
     }
 
     const normalizedEnvelope = buildLocalMessageEnvelope(envelope, {
         fallbackSystemInstruction: typeof config?.systemPrompt === 'string' ? config.systemPrompt : ''
     });
 
-    return requestBuilder({
+    const request = requestBuilder({
         config,
         envelope: normalizedEnvelope,
         stream: stream === true,
         apiKey
     });
+
+    applyProviderSearchConfig(providerDefinition.id, request.body, config);
+
+    return request;
 }

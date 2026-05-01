@@ -5,11 +5,12 @@
  * - 根据配置选择并路由到对应的 Provider 实现
  * - 管理多个 Provider 实例的注册和查找
  * - 提供统一的 generate 和 generateStream 接口
- * - 实现 Provider 的默认选择逻辑（优先 Gemini）
+ * - 实现 Provider 的默认选择逻辑
  *
- * 依赖：无
+ * 依赖：provider-registry.js
  * 被依赖：chat.js（主聊天模块）
  */
+import { getDefaultProviderId } from './provider-registry.js';
 
 /**
  * 规范化 Provider ID（转小写并去除空格）
@@ -64,9 +65,9 @@ export function createProviderRouter(providers = []) {
             return providerMap.get(configuredProviderId);
         }
 
-        // 默认优先使用 Gemini
-        if (providerMap.has('gemini')) {
-            return providerMap.get('gemini');
+        const defaultProviderId = getDefaultProviderId();
+        if (providerMap.has(defaultProviderId)) {
+            return providerMap.get(defaultProviderId);
         }
 
         // 否则返回第一个可用的 Provider

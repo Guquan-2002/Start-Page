@@ -68,7 +68,7 @@ test('ark provider parses non-stream response and maps thinking/web search', asy
         config: createArkConfig({
             backupApiKey: '',
             thinkingBudget: 'high',
-            searchMode: 'ark_web_search'
+            searchEnabled: true
         }),
         contextMessages,
         signal: new AbortController().signal

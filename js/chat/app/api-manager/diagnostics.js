@@ -8,6 +8,7 @@
  * - Print context debug info when enabled
  */
 import { buildContextPreview, normalizeMaxContextMessages } from '../../core/context-window.js';
+import { resolveProviderEndpoint } from '../../providers/provider-registry.js';
 
 const CONTEXT_DEBUG_STORAGE_KEY = 'llm_chat_context_debug';
 const CONTEXT_MAX_MESSAGES_STORAGE_KEY = 'llm_chat_context_max_messages';
@@ -17,48 +18,8 @@ function asTrimmedString(value) {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || '';
-}
-
-function appendEndpointPath(baseUrl, pathSuffix) {
-    if (!baseUrl) {
-        return '(missing apiUrl)';
-    }
-
-    return baseUrl.endsWith(pathSuffix) ? baseUrl : `${baseUrl}${pathSuffix}`;
-}
-
 export function resolveRequestEndpoint(config, useStreaming) {
-    const providerId = asTrimmedString(config?.provider);
-    const baseUrl = normalizeApiUrl(config?.apiUrl);
-
-    if (providerId === 'openai') {
-        return appendEndpointPath(baseUrl, '/chat/completions');
-    }
-
-    if (providerId === 'openai_responses' || providerId === 'ark_responses') {
-        return appendEndpointPath(baseUrl, '/responses');
-    }
-
-    if (providerId === 'anthropic') {
-        return appendEndpointPath(baseUrl, '/messages');
-    }
-
-    if (providerId === 'gemini') {
-        const model = asTrimmedString(config?.model);
-        if (!baseUrl || !model) {
-            return baseUrl || '(missing apiUrl)';
-        }
-
-        const endpointSuffix = useStreaming
-            ? ':streamGenerateContent?alt=sse'
-            : ':generateContent';
-        return `${baseUrl}/models/${encodeURIComponent(model)}${endpointSuffix}`;
-    }
-
-    return baseUrl || '(unknown endpoint)';
+    return resolveProviderEndpoint(config, useStreaming);
 }
 
 export function buildRequestDiagnosticDetail(config, {
@@ -68,12 +29,12 @@ export function buildRequestDiagnosticDetail(config, {
     errorDetail = ''
 } = {}) {
     const providerId = asTrimmedString(config?.provider) || '(unknown)';
-    const searchMode = asTrimmedString(config?.searchMode) || '(disabled)';
+    const searchState = config?.searchEnabled === true ? 'enabled' : 'disabled';
     const resolvedEndpoint = endpoint || resolveRequestEndpoint(config, useStreaming);
     const details = [
         `Provider=${providerId}`,
         `Endpoint=${resolvedEndpoint}`,
-        `SearchMode=${searchMode}`,
+        `Search=${searchState}`,
         `Streaming=${useStreaming ? 'true' : 'false'}`,
         `TimeoutMs=${timeoutMs}`
     ];

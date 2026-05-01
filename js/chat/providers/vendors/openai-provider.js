@@ -692,3 +692,15 @@ export function createOpenAiResponsesProvider(options = {}) {
     });
 }
 
+/**
+ * 创建 DeepSeek Chat Completions Provider 实例
+ * @param {Object} options - 创建选项
+ * @returns {ChatProvider} Provider 实例
+ */
+export function createDeepSeekProvider(options = {}) {
+    return createOpenAiProviderByMode({
+        ...options,
+        providerId: CHAT_PROVIDER_IDS.deepseek,
+        apiMode: OPENAI_API_MODES.chatCompletions
+    });
+}

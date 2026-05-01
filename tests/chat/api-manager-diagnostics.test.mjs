@@ -35,7 +35,7 @@ test('buildRequestDiagnosticDetail includes endpoint/streaming/timeout/error', (
         {
             provider: 'openai_responses',
             apiUrl: 'https://api.openai.com/v1',
-            searchMode: 'openai_web_search'
+            searchEnabled: true
         },
         {
             useStreaming: true,
@@ -46,7 +46,7 @@ test('buildRequestDiagnosticDetail includes endpoint/streaming/timeout/error', (
 
     assert.equal(detail.includes('Provider=openai_responses'), true);
     assert.equal(detail.includes('Endpoint=https://api.openai.com/v1/responses'), true);
-    assert.equal(detail.includes('SearchMode=openai_web_search'), true);
+    assert.equal(detail.includes('Search=enabled'), true);
     assert.equal(detail.includes('Streaming=true'), true);
     assert.equal(detail.includes('TimeoutMs=500'), true);
     assert.equal(detail.includes('Error=HTTP 400'), true);
@@ -95,4 +95,3 @@ test('resolveConnectTimeoutMs clamps invalid values to default', () => {
     assert.equal(resolveConnectTimeoutMs(-1), 30000);
     assert.equal(resolveConnectTimeoutMs(NaN), 30000);
 });
-

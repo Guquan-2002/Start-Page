@@ -6,8 +6,6 @@ import { parseImageDataUrl } from '../../core/local-message.js';
 
 const ANTHROPIC_API_VERSION = '2023-06-01';
 const DEFAULT_MAX_TOKENS = 4096;
-const ANTHROPIC_WEB_SEARCH_TOOL_TYPE = 'web_search_20250305';
-const ANTHROPIC_WEB_SEARCH_TOOL_NAME = 'web_search';
 
 function asTrimmedString(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -38,18 +36,6 @@ function resolveMaxTokens(config) {
     }
 
     return DEFAULT_MAX_TOKENS;
-}
-
-function buildAnthropicWebSearchTools(searchMode) {
-    if (searchMode !== 'anthropic_web_search') {
-        return undefined;
-    }
-
-    // Keep the tool payload minimal and rely on Anthropic defaults.
-    return [{
-        type: ANTHROPIC_WEB_SEARCH_TOOL_TYPE,
-        name: ANTHROPIC_WEB_SEARCH_TOOL_NAME
-    }];
 }
 
 function toAnthropicContentPart(part) {
@@ -143,11 +129,6 @@ export function buildAnthropicMessagesRequest({
         body.output_config = {
             effort: thinkingEffort
         };
-    }
-
-    const webSearchTools = buildAnthropicWebSearchTools(config?.searchMode);
-    if (webSearchTools) {
-        body.tools = webSearchTools;
     }
 
     return {

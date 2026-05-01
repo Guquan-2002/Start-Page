@@ -4,7 +4,7 @@
  * 职责：
  * - 将标准化的本地消息格式转换为 OpenAI Chat Completions API 的请求格式
  * - 处理图片的多种来源类型（url、data_url、base64）
- * - 支持 Reasoning Effort 和 Web Search 功能
+ * - 支持 Reasoning Effort 功能
  * - 构建完整的 API 请求对象（endpoint、headers、body）
  *
  * 依赖：无
@@ -180,14 +180,6 @@ export function buildOpenAiChatCompletionsRequest({
     // 添加 Reasoning Effort 配置
     if (typeof config?.thinkingBudget === 'string' && config.thinkingBudget) {
         body.reasoning_effort = config.thinkingBudget;
-    }
-
-    // 添加 Web Search 配置
-    if (
-        typeof config?.searchMode === 'string'
-        && (config.searchMode === 'openai_web_search' || config.searchMode.startsWith('openai_web_search_'))
-    ) {
-        body.web_search_options = {};
     }
 
     return {

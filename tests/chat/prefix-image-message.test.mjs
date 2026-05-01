@@ -354,7 +354,7 @@ test('openai web search uses streaming path with ping events clearing timeout', 
             getConfig() {
                 return createConfig({
                     provider: 'openai_responses',
-                    searchMode: 'openai_web_search',
+                    searchEnabled: true,
                     enablePseudoStream: true
                 });
             }
@@ -395,7 +395,7 @@ test('request failure includes provider diagnostics in error detail', async () =
                 return createConfig({
                     provider: 'openai_responses',
                     apiUrl: 'https://api.openai.com/v1',
-                    searchMode: 'openai_web_search',
+                    searchEnabled: true,
                     enablePseudoStream: false
                 });
             }
@@ -412,7 +412,7 @@ test('request failure includes provider diagnostics in error detail', async () =
     assert.equal(errorPayloads[0].title, 'Request failed');
     assert.equal(detail.includes('Provider=openai_responses'), true);
     assert.equal(detail.includes('Endpoint=https://api.openai.com/v1/responses'), true);
-    assert.equal(detail.includes('SearchMode=openai_web_search'), true);
+    assert.equal(detail.includes('Search=enabled'), true);
     assert.equal(detail.includes('TimeoutMs=500'), true);
     assert.equal(detail.includes('Error=HTTP 400: Invalid web_search request'), true);
 });

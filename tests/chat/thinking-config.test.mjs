@@ -25,6 +25,16 @@ test('thinking-config ark options and mapping', () => {
   assert.equal(formatForUi(CHAT_PROVIDER_IDS.arkResponses, { thinkingBudget: 'medium' }), 'medium');
 });
 
+// DeepSeek: disabled/high/max, Auto keeps provider default
+test('thinking-config deepseek options and mapping', () => {
+  const opts = getThinkingOptions(CHAT_PROVIDER_IDS.deepseek).map(o => o.value);
+  assert.deepEqual(opts, ['disabled','high','max']);
+  const m = normalizeFromUi(CHAT_PROVIDER_IDS.deepseek, 'max');
+  assert.equal(m.field, 'thinkingBudget');
+  assert.equal(m.value, 'max');
+  assert.equal(formatForUi(CHAT_PROVIDER_IDS.deepseek, { thinkingBudget: 'max' }), 'max');
+});
+
 // Anthropic: none/low/medium/high
 test('thinking-config anthropic options and mapping', () => {
   const opts = getThinkingOptions(CHAT_PROVIDER_IDS.anthropic).map(o => o.value);

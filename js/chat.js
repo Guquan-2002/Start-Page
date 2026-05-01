@@ -4,8 +4,7 @@ import {
     CHAT_DRAFTS_KEY,
     CHAT_HISTORY_KEY,
     CHAT_LIMITS,
-    CHAT_STORAGE_KEY,
-    CHAT_PROVIDER_IDS
+    CHAT_STORAGE_KEY
 } from './chat/constants.js';
 import { createConfigManager } from './chat/app/config-manager.js';
 import { setupMarked, renderMarkdown } from './chat/ui/markdown.js';
@@ -15,17 +14,18 @@ import { createApiManager } from './chat/app/api-manager.js';
 
 import { createSessionStore } from './chat/session/session-store.js';
 import { getMessageDisplayContent } from './chat/core/message-model.js';
-import { createGeminiProvider } from './chat/providers/vendors/gemini-provider.js';
 import {
-    createOpenAiProvider,
-    createOpenAiResponsesProvider
-} from './chat/providers/vendors/openai-provider.js';
-import { createArkProvider } from './chat/providers/vendors/ark-provider.js';
-import { createAnthropicProvider } from './chat/providers/vendors/anthropic-provider.js';
+    getDefaultProviderId,
+    getProviderDefinitions,
+    getProviderPlaceholders,
+    getProviderSearchConfig,
+    isSupportedProviderId
+} from './chat/providers/provider-registry.js';
+import { createRegisteredProviderClients } from './chat/providers/provider-clients.js';
 import { createProviderRouter } from './chat/providers/provider-router.js';
 import { createDraftManager } from './chat/storage/draft-storage.js';
 import { getThinkingOptions, getUiMeta } from './chat/app/thinking-config.js';
-import { initCustomSelect, refreshCustomSelect } from './chat/ui/custom-select.js';
+import { refreshCustomSelect } from './chat/ui/custom-select.js';
 
 const PENDING_THINKING_VALUE_ATTR = 'data-pending-thinking-value';
 function getChatElements() {
@@ -59,7 +59,7 @@ function getChatElements() {
         cfgThinkingLevel: $('#cfg-thinking-level'),
         cfgThinkingLabel: $('#cfg-thinking-label'),
         cfgThinkingNote: $('#cfg-thinking-note'),
-        cfgSearchMode: $('#cfg-search-mode'),
+        cfgSearchEnabled: $('#cfg-search-enabled'),
         cfgSearchLabel: $('#cfg-search-label'),
         cfgSearchNote: $('#cfg-search-note'),
         cfgEnablePseudoStream: $('#cfg-enable-pseudo-stream'),
@@ -102,52 +102,41 @@ function clearPendingThinkingValue(field) {
     }
 }
 
-function syncProviderPresentation(elements, providerId) {
-    const isGemini = providerId === CHAT_PROVIDER_IDS.gemini;
-    const isOpenAiCompletions = providerId === CHAT_PROVIDER_IDS.openai;
-    const isOpenAiResponses = providerId === CHAT_PROVIDER_IDS.openaiResponses;
-    const isOpenAi = isOpenAiCompletions || isOpenAiResponses;
-    const isArk = providerId === CHAT_PROVIDER_IDS.arkResponses;
-    const isAnthropic = providerId === CHAT_PROVIDER_IDS.anthropic;
+function populateProviderSelect(select) {
+    if (!select) return;
 
+    const previousValue = isSupportedProviderId(select.value)
+        ? select.value
+        : getDefaultProviderId();
+    while (select.firstChild) select.removeChild(select.firstChild);
+
+    getProviderDefinitions().forEach((provider) => {
+        const option = document.createElement('option');
+        option.value = provider.id;
+        option.textContent = provider.settingsLabel;
+        select.appendChild(option);
+    });
+
+    select.value = previousValue;
+    refreshCustomSelect(select);
+}
+
+function syncProviderPresentation(elements, providerId) {
+    const placeholders = getProviderPlaceholders(providerId);
     if (elements.cfgUrl) {
-        elements.cfgUrl.placeholder = isOpenAi
-            ? 'https://api.openai.com/v1'
-            : isArk
-                ? 'https://ark.cn-beijing.volces.com/api/v3/responses'
-            : isAnthropic
-                ? 'https://api.anthropic.com/v1'
-                : 'https://generativelanguage.googleapis.com/v1beta';
+        elements.cfgUrl.placeholder = placeholders.apiUrl || '';
     }
 
     if (elements.cfgKey) {
-        elements.cfgKey.placeholder = isOpenAi
-            ? 'sk-...'
-            : isArk
-                ? 'ark-...'
-            : isAnthropic
-                ? 'sk-ant-...'
-                : 'AIza...';
+        elements.cfgKey.placeholder = placeholders.apiKey || '';
     }
 
     if (elements.cfgBackupKey) {
-        elements.cfgBackupKey.placeholder = isOpenAi
-            ? 'sk-...'
-            : isArk
-                ? 'ark-...'
-            : isAnthropic
-                ? 'sk-ant-...'
-                : 'AIza...';
+        elements.cfgBackupKey.placeholder = placeholders.backupApiKey || placeholders.apiKey || '';
     }
 
     if (elements.cfgModel) {
-        elements.cfgModel.placeholder = isOpenAi
-            ? 'gpt-4o-mini'
-            : isArk
-                ? 'doubao-seed-2-0-pro-260215'
-            : isAnthropic
-                ? 'claude-sonnet-4-5-20250929'
-                : 'gemini-2.5-pro';
+        elements.cfgModel.placeholder = placeholders.model || '';
     }
 
     if (elements.cfgThinkingLabel || elements.cfgThinkingNote) {
@@ -177,33 +166,28 @@ function syncProviderPresentation(elements, providerId) {
         clearPendingThinkingValue(select);
         refreshCustomSelect(select);
         if (elements.cfgProvider) refreshCustomSelect(elements.cfgProvider);
-        if (elements.cfgSearchMode) refreshCustomSelect(elements.cfgSearchMode);
     }
 
+    const searchConfig = getProviderSearchConfig(providerId);
     if (elements.cfgSearchLabel) {
-        elements.cfgSearchLabel.textContent = isOpenAi
-            ? isOpenAiResponses
-                ? 'Web Search (OpenAI Responses)'
-                : 'Web Search (OpenAI Completions)'
-            : isArk
-                ? 'Web Search (Ark)'
-            : isAnthropic
-                ? 'Web Search (Anthropic)'
-                : 'Web Search (Gemini)';
+        elements.cfgSearchLabel.textContent = searchConfig?.label || 'Web Search';
     }
 
     if (elements.cfgSearchNote) {
-        elements.cfgSearchNote.textContent = isOpenAi
-            ? isOpenAiResponses
-                ? 'OpenAI Responses uses the basic web_search tool.'
-                : 'OpenAI Chat Completions uses basic web_search_options.'
-            : isArk
-                ? 'Ark uses the built-in web_search tool (single mode).'
-            : isAnthropic
-                ? 'Anthropic format: built-in web_search tool.'
-                : 'Gemini format: Google Search grounding.';
+        elements.cfgSearchNote.textContent = searchConfig?.note || '';
     }
-}export function initChat() {
+
+    if (elements.cfgSearchEnabled) {
+        const isSearchSupported = searchConfig?.supported !== false
+            && typeof searchConfig?.apply === 'function';
+        elements.cfgSearchEnabled.disabled = !isSearchSupported;
+        if (!isSearchSupported) {
+            elements.cfgSearchEnabled.checked = false;
+        }
+    }
+}
+
+export function initChat() {
     const elements = getChatElements();
     const store = createSessionStore({
         storage: globalThis.localStorage,
@@ -222,7 +206,7 @@ function syncProviderPresentation(elements, providerId) {
         cfgModel: elements.cfgModel,
         cfgPrompt: elements.cfgPrompt,
         cfgThinkingLevel: elements.cfgThinkingLevel,
-        cfgSearchMode: elements.cfgSearchMode,
+        cfgSearchEnabled: elements.cfgSearchEnabled,
         cfgEnablePseudoStream: elements.cfgEnablePseudoStream,
         cfgEnableDraftAutosave: elements.cfgEnableDraftAutosave,
         cfgPrefixWithTime: elements.cfgPrefixWithTime,
@@ -342,23 +326,9 @@ function syncProviderPresentation(elements, providerId) {
         onBlockedSessionOperation: notifySessionBusy
     });
 
-    const provider = createProviderRouter([
-        createGeminiProvider({
-            maxRetries: CHAT_LIMITS.maxRetries
-        }),
-        createOpenAiProvider({
-            maxRetries: CHAT_LIMITS.maxRetries
-        }),
-        createOpenAiResponsesProvider({
-            maxRetries: CHAT_LIMITS.maxRetries
-        }),
-        createArkProvider({
-            maxRetries: CHAT_LIMITS.maxRetries
-        }),
-        createAnthropicProvider({
-            maxRetries: CHAT_LIMITS.maxRetries
-        })
-    ]);
+    const provider = createProviderRouter(createRegisteredProviderClients({
+        maxRetries: CHAT_LIMITS.maxRetries
+    }));
 
     const apiManager = createApiManager({
         store,
@@ -517,12 +487,13 @@ function syncProviderPresentation(elements, providerId) {
         }
     });
 
+    populateProviderSelect(elements.cfgProvider);
     configManager.loadConfig();
     if (elements.cfgProvider) {
-        syncProviderPresentation(elements, elements.cfgProvider.value || CHAT_PROVIDER_IDS.gemini);
+        syncProviderPresentation(elements, elements.cfgProvider.value || getDefaultProviderId());
 
         elements.cfgProvider.addEventListener('change', () => {
-            const providerId = elements.cfgProvider.value || CHAT_PROVIDER_IDS.gemini;
+            const providerId = elements.cfgProvider.value || getDefaultProviderId();
             // Defer to run after config-manager's switchProvider handler,
             // so we can repopulate options and preserve the provider-specific value.
             setTimeout(() => syncProviderPresentation(elements, providerId), 0);
