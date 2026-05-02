@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const HOST = '127.0.0.1';
+const HOST = '0.0.0.0';
 const PORT = Number(process.env.PORT || 7121);
 const ROOT_DIR = __dirname;
 
