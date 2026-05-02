@@ -29,7 +29,7 @@
   - 失败消息一键回填
   - 支持Web Search
 
-## 🚀 快速开始
+## 🚀 Linux / WSL 快速开始
 
 ### 直接使用
 
@@ -39,18 +39,38 @@
 
 ### 本地服务
 
+要求：Node.js 20+
+
 ```bash
-# Node.js
 npm start
 ```
 
-访问 `http://localhost:7121`
+服务默认监听 `0.0.0.0:7121`，常用访问地址：
+
+- WSL/Linux 本机：`http://localhost:7121`
+- 需要指定绑定地址或端口：
+
+```bash
+HOST=0.0.0.0 PORT=7121 npm start
+```
 
 ### 运行测试
 
 ```bash
 npm test
 ```
+
+### systemd 运维
+
+当前项目可由系统级服务 `startpage.service` 托管，服务文件位于 `/etc/systemd/system/startpage.service`，仓库不维护该文件副本。
+
+```bash
+systemctl status startpage.service
+sudo systemctl restart startpage.service
+journalctl -u startpage.service -f
+```
+
+修改代码后，执行 `sudo systemctl restart startpage.service` 让服务加载最新版本。
 
 ## ⚙️ 配置
 

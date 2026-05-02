@@ -7,9 +7,26 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const HOST = '0.0.0.0';
-const PORT = Number(process.env.PORT || 7121);
+const DEFAULT_HOST = '0.0.0.0';
+const DEFAULT_PORT = 7121;
+const HOST = process.env.HOST || DEFAULT_HOST;
 const ROOT_DIR = __dirname;
+
+function resolvePort(rawPort) {
+  if (!rawPort) {
+    return DEFAULT_PORT;
+  }
+
+  const port = Number(rawPort);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error(`Invalid PORT "${rawPort}". Expected an integer between 1 and 65535.`);
+    process.exit(1);
+  }
+
+  return port;
+}
+
+const PORT = resolvePort(process.env.PORT);
 
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -37,29 +54,38 @@ function getContentType(filePath) {
 }
 
 function resolvePath(urlPath) {
-  const decodedPath = decodeURIComponent(urlPath.split('?')[0]);
-  const normalizedPath = path.normalize(decodedPath).replace(/^([\\/])+/, '');
-  const resolvedPath = path.resolve(ROOT_DIR, normalizedPath || 'index.html');
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(urlPath.split('?')[0]);
+  } catch {
+    return { statusCode: 400, message: 'Bad Request' };
+  }
 
-  if (!resolvedPath.startsWith(ROOT_DIR)) {
-    return null;
+  const normalizedPath = path.normalize(decodedPath.replace(/^([\\/])+/, ''));
+  const resolvedPath = path.resolve(ROOT_DIR, normalizedPath || 'index.html');
+  const relativePath = path.relative(ROOT_DIR, resolvedPath);
+
+  if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+    return { statusCode: 403, message: 'Forbidden' };
   }
 
   if (existsSync(resolvedPath) && statSync(resolvedPath).isDirectory()) {
-    return path.join(resolvedPath, 'index.html');
+    return { filePath: path.join(resolvedPath, 'index.html') };
   }
 
-  return resolvedPath;
+  return { filePath: resolvedPath };
 }
 
 const server = createServer(async (request, response) => {
   const requestPath = request.url === '/' ? '/index.html' : request.url || '/index.html';
-  const filePath = resolvePath(requestPath);
+  const resolved = resolvePath(requestPath);
 
-  if (!filePath) {
-    sendText(response, 403, 'Forbidden');
+  if (!resolved.filePath) {
+    sendText(response, resolved.statusCode, resolved.message);
     return;
   }
+
+  const { filePath } = resolved;
 
   try {
     await access(filePath);
@@ -86,7 +112,8 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Start Page running at http://${HOST}:${PORT}`);
+  console.log(`Start Page listening on http://${HOST}:${PORT}`);
+  console.log(`Local access: http://localhost:${PORT}`);
 });
 
 server.on('error', (error) => {
