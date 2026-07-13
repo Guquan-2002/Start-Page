@@ -108,13 +108,11 @@
 @media (max-width: 768px) {
     /* 隐藏滚动条但保持滚动功能 */
     #chat-messages::-webkit-scrollbar,
-    #chat-history::-webkit-scrollbar,
     .chat-settings-content::-webkit-scrollbar {
         width: 2px;
     }
 
     #chat-messages::-webkit-scrollbar-thumb,
-    #chat-history::-webkit-scrollbar-thumb,
     .chat-settings-content::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.15);
     }
@@ -191,7 +189,6 @@
     button,
     a,
     input[type="checkbox"],
-    .history-item,
     .chat-msg {
         min-height: 44px;
     }
@@ -199,9 +196,5 @@
     /* 确保按钮有足够的间距 */
     #chat-header-actions {
         gap: 8px;
-    }
-
-    #chat-history-actions {
-        gap: 6px;
     }
 }

@@ -7,7 +7,6 @@
   },
   "scripts": {
     "start": "node server.mjs",
-    "serve": "node server.mjs",
     "test": "node --test tests/chat/*.test.mjs"
   }
 }

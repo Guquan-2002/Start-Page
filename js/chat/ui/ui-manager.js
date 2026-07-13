@@ -9,8 +9,10 @@
  * - 管理消息列表的滚动和数量限制
  *
  * 依赖：markdown.js（Markdown 渲染）
- * 被依赖：api-manager, chat.js
+ * 被依赖：api-manager.js, chat.js
  */
+
+import { getMessageDisplayContent } from '../core/message-model.js';
 
 /**
  * 创建 UI 管理器
@@ -27,30 +29,27 @@ export function createUiManager({
     elements,
     renderMarkdown,
     maxRenderedMessages,
-    onRetryRequested = null,
-    isRetryBlocked = null
+    onRetryRequested,
+    isRetryBlocked
 }) {
     const {
         messagesEl,
         chatInput,
-        attachBtn = null,
+        attachBtn,
         sendBtn,
         stopBtn,
-        sessionActionButtons = []
+        sessionActionButtons
     } = elements;
 
-    // 规范化回调函数
-    const handleRetryRequested = typeof onRetryRequested === 'function'
-        ? onRetryRequested
-        : () => {};
-    const retryBlocked = typeof isRetryBlocked === 'function'
-        ? isRetryBlocked
-        : () => false;
+    function resizeInput() {
+        chatInput.style.height = 'auto';
+        chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
+    }
 
     /**
      * 滚动到消息列表底部
      */
-    function scrollToBottom(smooth = true) {
+    function scrollToBottom(smooth) {
         messagesEl.scrollTo({
             top: messagesEl.scrollHeight,
             behavior: smooth ? 'smooth' : 'auto'
@@ -58,7 +57,33 @@ export function createUiManager({
     }
 
     /**
-     * 为代码块添加复制按钮
+     * 对代码块应用 highlight.js 语法高亮
+     *
+     * marked 5+ 不再在解析时高亮，因此需要在渲染后对 <pre><code> 直接调用
+     * hljs.highlightElement。仅处理带 language-xxx 类名的代码块，避免对
+     * 无语言标注的纯文本块做 highlightAuto（噪点多且较慢）。
+     */
+    function highlightCodeElement(code) {
+        if (!code || code.dataset.hljsHighlighted) return;
+
+        const hljs = globalThis.hljs;
+        if (typeof hljs === 'undefined' || !hljs || typeof hljs.highlightElement !== 'function') {
+            return;
+        }
+
+        const hasLanguage = Array.from(code.classList).some((cls) => (
+            cls.startsWith('language-') && cls.length > 'language-'.length
+        ));
+        if (!hasLanguage) {
+            return;
+        }
+
+        hljs.highlightElement(code);
+        code.dataset.hljsHighlighted = 'true';
+    }
+
+    /**
+     * 为代码块添加复制按钮并应用语法高亮
      *
      * 遍历容器中的所有 <pre> 元素，为每个代码块添加复制按钮
      * 点击按钮后复制代码到剪贴板，并显示成功反馈
@@ -67,14 +92,17 @@ export function createUiManager({
         container.querySelectorAll('pre').forEach((pre) => {
             if (pre.querySelector('.code-copy-btn')) return;
 
+            const code = pre.querySelector('code');
+            highlightCodeElement(code);
+
             const button = document.createElement('button');
             button.className = 'code-copy-btn';
             button.innerHTML = '<i class="fas fa-copy"></i>';
             button.title = 'Copy code';
 
             button.addEventListener('click', () => {
-                const code = pre.querySelector('code')?.textContent || pre.textContent || '';
-                navigator.clipboard.writeText(code)
+                const codeText = code?.textContent || pre.textContent || '';
+                navigator.clipboard.writeText(codeText)
                     .then(() => {
                         button.innerHTML = '<i class="fas fa-check"></i>';
                         setTimeout(() => {
@@ -135,21 +163,9 @@ export function createUiManager({
      * @param {Object} identifiers - 标识符（messageId、turnId）
      * @returns {HTMLElement} 消息元素
      */
-    function buildMessageElement(role, displayRole, identifiers = {}) {
+    function buildMessageElement(role, displayRole) {
         const messageElement = document.createElement('div');
         messageElement.className = `chat-msg ${displayRole || role}`;
-
-        const messageId = typeof identifiers?.messageId === 'string' ? identifiers.messageId : '';
-        const turnId = typeof identifiers?.turnId === 'string' ? identifiers.turnId : '';
-
-        if (messageId) {
-            messageElement.dataset.messageId = messageId;
-        }
-
-        if (turnId) {
-            messageElement.dataset.turnId = turnId;
-        }
-
         return messageElement;
     }
 
@@ -203,7 +219,7 @@ export function createUiManager({
     function addMessage(role, text, meta = null, identifiers = {}) {
         const displayRole = typeof meta?.displayRole === 'string' ? meta.displayRole : role;
         const shouldShowRetry = role === 'user' && displayRole === 'user' && !meta?.isPrefixMessage;
-        const messageElement = buildMessageElement(role, displayRole, identifiers);
+        const messageElement = buildMessageElement(role, displayRole);
 
         // 助手消息使用 Markdown 渲染
         if (displayRole === 'assistant' && text) {
@@ -226,11 +242,11 @@ export function createUiManager({
             retryButton.title = 'Retry from this message';
 
             retryButton.addEventListener('click', () => {
-                if (retryBlocked()) {
+                if (isRetryBlocked()) {
                     return;
                 }
 
-                handleRetryRequested({
+                onRetryRequested({
                     turnId: identifiers.turnId,
                     messageId: identifiers.messageId,
                     content: text
@@ -244,16 +260,6 @@ export function createUiManager({
     }
 
     /**
-     * 添加加载动画消息
-     */
-    function addLoadingMessage() {
-        const loadingMessage = addMessage('assistant', '');
-        loadingMessage.innerHTML = '<span class="chat-loading"><span></span><span></span><span></span></span>';
-        loadingMessage.classList.add('typing');
-        return loadingMessage;
-    }
-
-    /**
      * 创建助手流式消息元素
      *
      * 用于流式响应时逐步更新内容
@@ -262,7 +268,7 @@ export function createUiManager({
         initialText = '',
         placeholder = false
     } = {}) {
-        const messageElement = buildMessageElement('assistant', 'assistant', identifiers);
+        const messageElement = buildMessageElement('assistant', 'assistant');
         messageElement.classList.add('is-streaming');
         if (placeholder) {
             messageElement.classList.add('is-streaming-placeholder');
@@ -364,21 +370,19 @@ export function createUiManager({
      * 清空现有消息并渲染所有消息
      *
      * @param {Array} messages - 消息数组
-     * @param {Function} resolveDisplayContent - 解析显示内容的函数
      */
-    function renderConversation(messages, resolveDisplayContent) {
-        clearMessages();
-
+    function appendChatMessages(messages) {
         messages.forEach((message) => {
-            const displayContent = typeof resolveDisplayContent === 'function'
-                ? resolveDisplayContent(message)
-                : message.content;
-
-            addMessage(message.role, displayContent, message.meta, {
+            addMessage(message.role, getMessageDisplayContent(message), message.meta, {
                 messageId: message.id,
                 turnId: message.turnId
             });
         });
+    }
+
+    function renderConversation(messages) {
+        clearMessages();
+        appendChatMessages(messages);
     }
 
     /**
@@ -386,9 +390,7 @@ export function createUiManager({
      */
     function setInputEnabled(enabled) {
         chatInput.disabled = !enabled;
-        if (attachBtn && 'disabled' in attachBtn) {
-            attachBtn.disabled = !enabled;
-        }
+        attachBtn.disabled = !enabled;
         sendBtn.disabled = !enabled;
     }
 
@@ -397,9 +399,7 @@ export function createUiManager({
      */
     function setSessionActionsEnabled(enabled) {
         sessionActionButtons.forEach((button) => {
-            if (button && 'disabled' in button) {
-                button.disabled = !enabled;
-            }
+            button.disabled = !enabled;
         });
     }
 
@@ -439,8 +439,7 @@ export function createUiManager({
         const notice = document.createElement('div');
         notice.className = 'chat-msg system';
         notice.textContent = text;
-        messagesEl.appendChild(notice);
-        scrollToBottom(false);
+        appendMessageElement(notice);
 
         if (removeAfterMs > 0) {
             setTimeout(() => notice.remove(), removeAfterMs);
@@ -465,16 +464,14 @@ export function createUiManager({
     }
 
     return {
-        addCopyButtons,
         addErrorMessage,
-        addLoadingMessage,
         addMessage,
         addSystemNotice,
-        clearMessages,
+        appendChatMessages,
         createAssistantStreamingMessage,
         finalizeAssistantStreamingMessage,
         renderConversation,
-        scrollToBottom,
+        resizeInput,
         setStreamingUI,
         showRetryNotice,
         showBackupKeyNotice,

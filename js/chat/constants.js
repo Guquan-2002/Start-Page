@@ -11,28 +11,10 @@
 
 // localStorage 存储键
 export const CHAT_STORAGE_KEY = 'llm_chat_config';
-export const CHAT_HISTORY_KEY = 'llm_chat_history_v2';
-export const CHAT_DRAFTS_KEY = 'llm_chat_drafts_v1';
 
-// 历史记录 schema 版本号
-export const CHAT_SCHEMA_VERSION = 3;
-
-// Markdown 和流式响应标记符
-export const SOURCES_MARKDOWN_MARKER = '\n\n---\n**Sources**\n'; // 来源部分标记
+// 流式响应标记符
 export const ASSISTANT_SEGMENT_MARKER = '<|CHANGE_ROLE|>'; // 段落分隔标记
 export const ASSISTANT_SENTENCE_MARKER = '<|END_SENTENCE|>'; // 句子结束标记
-
-export {
-    CHAT_PROVIDER_IDS,
-    CHAT_DEFAULTS,
-    GEMINI_DEFAULTS,
-    OPENAI_DEFAULTS,
-    OPENAI_RESPONSES_DEFAULTS,
-    DEEPSEEK_DEFAULTS,
-    ARK_RESPONSES_DEFAULTS,
-    ANTHROPIC_DEFAULTS,
-    getProviderDefaults
-} from './providers/provider-registry.js';
 
 // 运行时限制配置
 export const CHAT_LIMITS = Object.freeze({
@@ -40,6 +22,7 @@ export const CHAT_LIMITS = Object.freeze({
     maxContextMessages: 120,        // 最大上下文消息数
     maxRenderedMessages: 1000,      // 最大渲染消息数
     connectTimeoutMs: 30000,        // 连接超时时间（毫秒）
-    maxRetries: 3                   // 最大重试次数
+    maxRetries: 3,                  // 最大重试次数
+    maxRetryDelayMs: 8000,          // 重试最大延迟时间（毫秒）
+    tokenPerImage: 2000             // 每张图片的保守 Token 估算（实际约 85-1600，取偏大值保底）
 });
-

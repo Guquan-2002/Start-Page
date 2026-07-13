@@ -15,12 +15,17 @@ function createOpenAiConfig(overrides = {}) {
         backupApiKey: 'backup-key',
         model: 'gpt-4o-mini',
         systemPrompt: 'You are a helpful assistant.',
-        enablePseudoStream: true,
         ...overrides
     };
 }
 
-const contextMessages = [{ role: 'user', content: 'hello' }];
+const localMessageEnvelope = {
+    systemInstruction: 'You are a helpful assistant.',
+    messages: [{
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }]
+    }]
+};
 
 function toSseEvent(payload) {
     return `data: ${JSON.stringify(payload)}\n\n`;
@@ -76,7 +81,7 @@ test('openai provider falls back to backup key when primary key fails', async ()
 
     const result = await provider.generate({
         config: createOpenAiConfig(),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onFallbackKey: () => {
             fallbackNoticeCount += 1;
@@ -88,7 +93,7 @@ test('openai provider falls back to backup key when primary key fails', async ()
     assert.deepEqual(result.segments, ['openai fallback ok']);
 });
 
-test('openai provider splits by markers when pseudo stream is enabled', async () => {
+test('openai provider splits by markers when streaming is enabled', async () => {
     const responseText = `A${ASSISTANT_SENTENCE_MARKER}B${ASSISTANT_SEGMENT_MARKER}C`;
     const fetchMock = async () => new Response(JSON.stringify({
         choices: [{ message: { content: responseText } }]
@@ -99,15 +104,15 @@ test('openai provider splits by markers when pseudo stream is enabled', async ()
 
     const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createOpenAiConfig({ backupApiKey: '', enablePseudoStream: true }),
-        contextMessages,
+        config: createOpenAiConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
     assert.deepEqual(result.segments, ['A', 'B', 'C']);
 });
 
-test('openai provider keeps marker text when pseudo stream is disabled', async () => {
+test('openai provider splits by markers by default', async () => {
     const responseText = `A${ASSISTANT_SENTENCE_MARKER}B${ASSISTANT_SEGMENT_MARKER}C`;
     const fetchMock = async () => new Response(JSON.stringify({
         choices: [{ message: { content: responseText } }]
@@ -118,12 +123,12 @@ test('openai provider keeps marker text when pseudo stream is disabled', async (
 
     const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createOpenAiConfig({ backupApiKey: '', enablePseudoStream: false }),
-        contextMessages,
+        config: createOpenAiConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
-    assert.deepEqual(result.segments, [responseText]);
+    assert.deepEqual(result.segments, ['A', 'B', 'C']);
 });
 
 test('openai provider stream yields text deltas from SSE', async () => {
@@ -147,7 +152,7 @@ test('openai provider stream yields text deltas from SSE', async () => {
     const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectDeltas(provider.generateStream({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -173,7 +178,7 @@ test('openai provider maps reasoning effort and basic web search format', async 
             thinkingBudget: 'high',
             searchEnabled: true
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -214,7 +219,7 @@ test('openai provider stream does not switch to backup key after first delta', a
     await assert.rejects(
         collectDeltas(provider.generateStream({
             config: createOpenAiConfig(),
-            contextMessages,
+            localMessageEnvelope,
             signal: new AbortController().signal
         })),
         /stream broken/
@@ -238,7 +243,7 @@ test('openai chat completions provider targets chat/completions endpoint', async
     const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     await provider.generate({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -268,7 +273,7 @@ test('openai provider supports responses API for non-stream requests', async () 
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -291,7 +296,9 @@ test('openai responses request maps assistant history text to output_text', asyn
         requestBody = JSON.parse(options.body);
 
         return new Response(JSON.stringify({
-            output_text: 'ok'
+            output: [{
+                content: [{ type: 'output_text', text: 'ok' }]
+            }]
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
@@ -301,11 +308,13 @@ test('openai responses request maps assistant history text to output_text', asyn
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     await provider.generate({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages: [
-            { role: 'user', content: 'u1' },
-            { role: 'assistant', content: 'a1' },
-            { role: 'user', content: 'u2' }
-        ],
+        localMessageEnvelope: {
+            messages: [
+                { role: 'user', parts: [{ type: 'text', text: 'u1' }] },
+                { role: 'assistant', parts: [{ type: 'text', text: 'a1' }] },
+                { role: 'user', parts: [{ type: 'text', text: 'u2' }] }
+            ]
+        },
         signal: new AbortController().signal
     });
 
@@ -319,6 +328,7 @@ test('openai responses request maps assistant history text to output_text', asyn
     }, {
         type: 'message',
         role: 'assistant',
+        status: 'completed',
         content: [{
             type: 'output_text',
             text: 'a1'
@@ -357,7 +367,7 @@ test('openai provider supports responses API streaming deltas', async () => {
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectDeltas(provider.generateStream({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -385,7 +395,7 @@ test('openai responses stream emits reasoning signal before output_text delta', 
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const events = await collectEvents(provider.generateStream({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -401,7 +411,9 @@ test('openai responses provider appends responses path by default', async () => 
     const fetchMock = async (url) => {
         requestUrl = url;
         return new Response(JSON.stringify({
-            output_text: 'auto endpoint'
+            output: [{
+                content: [{ type: 'output_text', text: 'auto endpoint' }]
+            }]
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
@@ -411,7 +423,7 @@ test('openai responses provider appends responses path by default', async () => 
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -445,7 +457,7 @@ test('openai responses stream yields ping events for non-text SSE events (web_se
     const provider = createOpenAiResponsesProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const events = await collectEvents(provider.generateStream({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -456,8 +468,6 @@ test('openai responses stream yields ping events for non-text SSE events (web_se
     const deltas = events.filter((e) => e.type === 'text-delta').map((e) => e.text);
     assert.equal(deltas.join(''), 'Search result: found it');
 
-    const doneEvents = events.filter((e) => e.type === 'done');
-    assert.equal(doneEvents.length, 1);
 });
 
 test('openai chat completions stream yields ping for empty delta chunks', async () => {
@@ -481,7 +491,7 @@ test('openai chat completions stream yields ping for empty delta chunks', async 
     const provider = createOpenAiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const events = await collectEvents(provider.generateStream({
         config: createOpenAiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 

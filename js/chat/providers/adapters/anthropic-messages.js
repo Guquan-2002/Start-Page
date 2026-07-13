@@ -3,18 +3,21 @@
  * Converts normalized local messages into Anthropic Messages request payload.
  */
 import { parseImageDataUrl } from '../../core/local-message.js';
+import { normalizeApiUrl } from '../../../shared/string-utils.js';
+import { resolveAnthropicEndpoint } from '../endpoint-resolver.js';
 
 const ANTHROPIC_API_VERSION = '2023-06-01';
-const DEFAULT_MAX_TOKENS = 4096;
 
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
+/**
+ * 输出 token 上限。
+ *
+ * Anthropic Messages API 强制要求 max_tokens，这里取一个对当前 Claude 系列
+ * （Sonnet 4 / 4.5 / 3.7 / Opus 4 均支持 ≥32k 输出）都不会触发 400 的较高值，
+ * 实际上不截断正常回答。客户端不再暴露任何长度调节旋钮。
+ */
+const MAX_OUTPUT_TOKENS = 32000;
 
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || null;
-}
+
 
 function normalizeThinkingEffort(rawValue) {
     if (typeof rawValue !== 'string') {
@@ -27,15 +30,6 @@ function normalizeThinkingEffort(rawValue) {
 
 function isThinkingDisabledByEffort(effort) {
     return !effort || effort.toLowerCase() === 'none';
-}
-
-function resolveMaxTokens(config) {
-    const parsed = Number.parseInt(config?.maxTokens, 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-        return parsed;
-    }
-
-    return DEFAULT_MAX_TOKENS;
 }
 
 function toAnthropicContentPart(part) {
@@ -108,7 +102,7 @@ export function buildAnthropicMessagesRequest({
     const thinkingEffort = normalizeThinkingEffort(config?.thinkingEffort);
     const body = {
         model: config.model,
-        max_tokens: resolveMaxTokens(config),
+        max_tokens: MAX_OUTPUT_TOKENS,
         stream,
         messages: envelope.messages.map((message) => ({
             role: message.role === 'assistant' ? 'assistant' : 'user',
@@ -131,8 +125,15 @@ export function buildAnthropicMessagesRequest({
         };
     }
 
+    if (config.searchEnabled === true) {
+        body.tools = [{
+            type: 'web_search_20250305',
+            name: 'web_search'
+        }];
+    }
+
     return {
-        endpoint: `${baseUrl}/messages`,
+        endpoint: resolveAnthropicEndpoint(baseUrl),
         headers: {
             'Content-Type': 'application/json',
             'x-api-key': apiKey,

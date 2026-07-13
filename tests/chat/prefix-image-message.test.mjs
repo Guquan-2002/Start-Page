@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 
 import { createApiManager } from '../../js/chat/app/api-manager.js';
 
+function createTestApiManager(options) {
+    return createApiManager({
+        ...options,
+        onConversationUpdated() {},
+        onUserMessageAccepted() {}
+    });
+}
+
 function createChatInput() {
     const listeners = new Map();
     return {
@@ -35,8 +43,8 @@ function createStore() {
         getActiveMessages() {
             return [...messages];
         },
-        getActiveSessionId() {
-            return 'session_1';
+        getConversationId() {
+            return 'conv_1';
         },
         isStreaming() {
             return streaming;
@@ -48,9 +56,6 @@ function createStore() {
             streaming = false;
         },
         requestAbort(reason) {
-            abortReason = reason;
-        },
-        setAbortReason(reason) {
             abortReason = reason;
         },
         getAbortReason() {
@@ -72,11 +77,13 @@ function createUi() {
 
     return {
         addMessage() {},
+        appendChatMessages() {},
         addSystemNotice() {},
         addErrorMessage() {},
         setStreamingUI() {},
         showRetryNotice() {},
         showBackupKeyNotice() {},
+        resizeInput() {},
         createAssistantStreamingMessage() {
             return createStreamingElement();
         },
@@ -90,24 +97,43 @@ function createUi() {
                 messageElement.textContent = text;
             }
         },
-        addLoadingMessage() {
-            return {
-                remove() {},
-                classList: {
-                    remove() {}
-                }
-            };
-        }
     };
 }
 
 function createElements(chatInput) {
     return {
         chatInput,
+        attachBtn: {
+            title: '',
+            classList: { toggle() {} },
+            addEventListener() {}
+        },
+        imageInput: {
+            value: '',
+            files: [],
+            addEventListener() {},
+            click() {}
+        },
+        attachmentsEl: {
+            innerHTML: '',
+            appendChild() {}
+        },
         settingsDiv: {
             classList: {
                 remove() {}
             }
+        }
+    };
+}
+
+if (typeof globalThis.document === 'undefined') {
+    globalThis.document = {
+        createElement() {
+            return {
+                appendChild() {},
+                addEventListener() {},
+                classList: { add() {}, remove() {}, toggle() {} }
+            };
         }
     };
 }
@@ -118,7 +144,6 @@ function createConfig(overrides = {}) {
         apiKey: 'key',
         backupApiKey: '',
         model: 'gemini-3-pro-preview',
-        enablePseudoStream: false,
         prefixWithTime: false,
         prefixWithName: false,
         userName: 'User',
@@ -171,13 +196,13 @@ test('image-only message injects user-name prefix as first text part', async () 
         const generateCalls = [];
         const provider = {
             id: 'mock-provider',
-            async generate(params) {
+            async *generateStream(params) {
                 generateCalls.push(params);
-                return { segments: ['ok'] };
+                yield { type: 'text-delta', text: 'ok' };
             }
         };
 
-        const manager = createApiManager({
+        const manager = createTestApiManager({
             store,
             elements: createElements(chatInput),
             ui: createUi(),
@@ -216,12 +241,10 @@ test('image-only message with blank userName does not inject prefix text part', 
         const store = createStore();
         const provider = {
             id: 'mock-provider',
-            async generate() {
-                return { segments: ['ok'] };
-            }
+            async *generateStream() { yield { type: 'text-delta', text: 'ok' }; }
         };
 
-        const manager = createApiManager({
+        const manager = createTestApiManager({
             store,
             elements: createElements(chatInput),
             ui: createUi(),
@@ -255,12 +278,10 @@ test('image-only message with prefixWithName disabled keeps original behavior', 
         const store = createStore();
         const provider = {
             id: 'mock-provider',
-            async generate() {
-                return { segments: ['ok'] };
-            }
+            async *generateStream() { yield { type: 'text-delta', text: 'ok' }; }
         };
 
-        const manager = createApiManager({
+        const manager = createTestApiManager({
             store,
             elements: createElements(chatInput),
             ui: createUi(),
@@ -294,12 +315,10 @@ test('text + image message keeps single text part with prefixed content', async 
         const store = createStore();
         const provider = {
             id: 'mock-provider',
-            async generate() {
-                return { segments: ['ok'] };
-            }
+            async *generateStream() { yield { type: 'text-delta', text: 'ok' }; }
         };
 
-        const manager = createApiManager({
+        const manager = createTestApiManager({
             store,
             elements: createElements(chatInput),
             ui: createUi(),
@@ -330,23 +349,17 @@ test('text + image message keeps single text part with prefixed content', async 
 test('openai web search uses streaming path with ping events clearing timeout', async () => {
     const chatInput = createChatInput();
     const store = createStore();
-    let generateCount = 0;
     let generateStreamCount = 0;
     const provider = {
         id: 'mock-provider',
-        async generate() {
-            generateCount += 1;
-            return { segments: ['ok'] };
-        },
         async *generateStream() {
             generateStreamCount += 1;
             yield { type: 'ping' };
             yield { type: 'text-delta', text: 'stream' };
-            yield { type: 'done' };
         }
     };
 
-    const manager = createApiManager({
+    const manager = createTestApiManager({
         store,
         elements: createElements(chatInput),
         ui: createUi(),
@@ -355,7 +368,6 @@ test('openai web search uses streaming path with ping events clearing timeout', 
                 return createConfig({
                     provider: 'openai_responses',
                     searchEnabled: true,
-                    enablePseudoStream: true
                 });
             }
         },
@@ -366,7 +378,6 @@ test('openai web search uses streaming path with ping events clearing timeout', 
     chatInput.value = 'search today gold price';
     await manager.sendMessage();
 
-    assert.equal(generateCount, 0);
     assert.equal(generateStreamCount, 1);
 });
 
@@ -376,7 +387,7 @@ test('request failure includes provider diagnostics in error detail', async () =
     const errorPayloads = [];
     const provider = {
         id: 'mock-provider',
-        async generate() {
+        async *generateStream() {
             throw new Error('HTTP 400: Invalid web_search request');
         }
     };
@@ -386,7 +397,7 @@ test('request failure includes provider diagnostics in error detail', async () =
         errorPayloads.push(payload);
     };
 
-    const manager = createApiManager({
+    const manager = createTestApiManager({
         store,
         elements: createElements(chatInput),
         ui,
@@ -396,7 +407,6 @@ test('request failure includes provider diagnostics in error detail', async () =
                     provider: 'openai_responses',
                     apiUrl: 'https://api.openai.com/v1',
                     searchEnabled: true,
-                    enablePseudoStream: false
                 });
             }
         },

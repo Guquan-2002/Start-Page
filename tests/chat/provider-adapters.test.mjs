@@ -1,8 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { CHAT_PROVIDER_IDS } from '../../js/chat/constants.js';
-import { buildProviderRequest } from '../../js/chat/providers/format-router.js';
+import { CHAT_PROVIDER_IDS } from '../../js/chat/providers/provider-registry.js';
+import { buildAnthropicMessagesRequest } from '../../js/chat/providers/adapters/anthropic-messages.js';
+import { buildArkResponsesRequest } from '../../js/chat/providers/adapters/ark-responses.js';
+import { buildDeepSeekChatCompletionsRequest } from '../../js/chat/providers/adapters/deepseek-chat-completions.js';
+import { buildGeminiGenerateContentRequest } from '../../js/chat/providers/adapters/gemini-generate-content.js';
+import { buildOpenAiChatCompletionsRequest } from '../../js/chat/providers/adapters/openai-chat-completions.js';
+import { buildOpenAiResponsesRequest } from '../../js/chat/providers/adapters/openai-responses.js';
+
+const REQUEST_BUILDERS = {
+    [CHAT_PROVIDER_IDS.anthropic]: buildAnthropicMessagesRequest,
+    [CHAT_PROVIDER_IDS.arkResponses]: buildArkResponsesRequest,
+    [CHAT_PROVIDER_IDS.deepseek]: buildDeepSeekChatCompletionsRequest,
+    [CHAT_PROVIDER_IDS.gemini]: buildGeminiGenerateContentRequest,
+    [CHAT_PROVIDER_IDS.openai]: buildOpenAiChatCompletionsRequest,
+    [CHAT_PROVIDER_IDS.openaiResponses]: buildOpenAiResponsesRequest
+};
+
+function buildAdapterRequest({ providerId, ...options }) {
+    return REQUEST_BUILDERS[providerId](options);
+}
 
 function createBaseConfig(overrides = {}) {
     return {
@@ -17,8 +35,8 @@ function createBaseConfig(overrides = {}) {
     };
 }
 
-test('format router builds OpenAI chat completions request for text+image message', () => {
-    const request = buildProviderRequest({
+test('OpenAI chat completions adapter builds a text and image request', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.openai,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.openai,
@@ -65,8 +83,8 @@ test('format router builds OpenAI chat completions request for text+image messag
     ]);
 });
 
-test('format router builds OpenAI responses request with input_text + input_image(file_id)', () => {
-    const request = buildProviderRequest({
+test('OpenAI responses adapter builds input_text and input_image parts', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.openaiResponses,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.openaiResponses,
@@ -108,8 +126,8 @@ test('format router builds OpenAI responses request with input_text + input_imag
     });
 });
 
-test('format router maps OpenAI responses assistant history text to output_text', () => {
-    const request = buildProviderRequest({
+test('OpenAI responses adapter maps assistant history text to output_text', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.openaiResponses,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.openaiResponses,
@@ -145,6 +163,7 @@ test('format router maps OpenAI responses assistant history text to output_text'
         {
             type: 'message',
             role: 'assistant',
+            status: 'completed',
             content: [{ type: 'output_text', text: 'a1' }]
         },
         {
@@ -155,8 +174,8 @@ test('format router maps OpenAI responses assistant history text to output_text'
     ]);
 });
 
-test('format router throws when OpenAI responses assistant history includes image', () => {
-    assert.throws(() => buildProviderRequest({
+test('OpenAI responses adapter rejects assistant image history', () => {
+    assert.throws(() => buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.openaiResponses,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.openaiResponses,
@@ -180,8 +199,8 @@ test('format router throws when OpenAI responses assistant history includes imag
     }), /assistant message does not support image parts/);
 });
 
-test('format router builds Ark responses request with thinking + web search', () => {
-    const request = buildProviderRequest({
+test('Ark responses adapter builds thinking and web search fields', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.arkResponses,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.arkResponses,
@@ -231,8 +250,56 @@ test('format router builds Ark responses request with thinking + web search', ()
     });
 });
 
-test('format router builds DeepSeek chat completions request with thinking enabled and no native search payload', () => {
-    const request = buildProviderRequest({
+test('Ark responses adapter maps assistant history text to output_text', () => {
+    const request = buildAdapterRequest({
+        providerId: CHAT_PROVIDER_IDS.arkResponses,
+        config: createBaseConfig({
+            provider: CHAT_PROVIDER_IDS.arkResponses,
+            apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
+            model: 'doubao-seed-2-0-pro-260215'
+        }),
+        envelope: {
+            messages: [
+                { role: 'user', parts: [{ type: 'text', text: 'u1' }] },
+                { role: 'assistant', parts: [{ type: 'text', text: 'a1' }] },
+                { role: 'user', parts: [{ type: 'text', text: 'u2' }] }
+            ]
+        },
+        stream: false,
+        apiKey: 'ark-key'
+    });
+
+    assert.deepEqual(request.body.input, [
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'u1' }] },
+        { type: 'message', role: 'assistant', status: 'completed', content: [{ type: 'output_text', text: 'a1' }] },
+        { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'u2' }] }
+    ]);
+});
+
+test('Ark responses adapter rejects assistant image history', () => {
+    assert.throws(() => buildAdapterRequest({
+        providerId: CHAT_PROVIDER_IDS.arkResponses,
+        config: createBaseConfig({
+            provider: CHAT_PROVIDER_IDS.arkResponses,
+            apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
+            model: 'doubao-seed-2-0-pro-260215'
+        }),
+        envelope: {
+            messages: [{
+                role: 'assistant',
+                parts: [{
+                    type: 'image',
+                    image: { sourceType: 'url', value: 'https://example.com/a.png' }
+                }]
+            }]
+        },
+        stream: false,
+        apiKey: 'ark-key'
+    }), /assistant message does not support image parts/);
+});
+
+test('DeepSeek adapter enables thinking without native search payload', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.deepseek,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.deepseek,
@@ -259,7 +326,7 @@ test('format router builds DeepSeek chat completions request with thinking enabl
         type: 'enabled'
     });
     assert.equal(request.body.reasoning_effort, 'max');
-    assert.equal(request.body.web_search_options, undefined);
+    assert.deepEqual(request.body.web_search_options, {});
     assert.equal(request.body.tools, undefined);
     assert.deepEqual(request.body.messages, [
         { role: 'system', content: 'DeepSeek system' },
@@ -267,8 +334,8 @@ test('format router builds DeepSeek chat completions request with thinking enabl
     ]);
 });
 
-test('format router builds DeepSeek chat completions request with thinking disabled', () => {
-    const request = buildProviderRequest({
+test('DeepSeek adapter disables thinking', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.deepseek,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.deepseek,
@@ -292,8 +359,8 @@ test('format router builds DeepSeek chat completions request with thinking disab
     assert.equal(request.body.reasoning_effort, undefined);
 });
 
-test('format router builds Anthropic request with top-level system and base64 image source', () => {
-    const request = buildProviderRequest({
+test('Anthropic adapter builds system, image, thinking, and search fields', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.anthropic,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.anthropic,
@@ -343,8 +410,8 @@ test('format router builds Anthropic request with top-level system and base64 im
     });
 });
 
-test('format router omits Anthropic thinking when effort is none', () => {
-    const request = buildProviderRequest({
+test('Anthropic adapter omits thinking when effort is none', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.anthropic,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.anthropic,
@@ -367,8 +434,8 @@ test('format router omits Anthropic thinking when effort is none', () => {
     assert.equal(request.body.tools, undefined);
 });
 
-test('format router builds Gemini request with inline_data and file_data parts', () => {
-    const request = buildProviderRequest({
+test('Gemini adapter builds inline_data and file_data parts', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.gemini,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.gemini,
@@ -432,8 +499,8 @@ test('format router builds Gemini request with inline_data and file_data parts',
     });
 });
 
-test('format router omits Gemini thinkingConfig when thinkingLevel is empty', () => {
-    const request = buildProviderRequest({
+test('Gemini adapter omits thinkingConfig when thinkingLevel is empty', () => {
+    const request = buildAdapterRequest({
         providerId: CHAT_PROVIDER_IDS.gemini,
         config: createBaseConfig({
             provider: CHAT_PROVIDER_IDS.gemini,

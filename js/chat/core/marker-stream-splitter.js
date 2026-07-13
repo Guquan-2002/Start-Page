@@ -80,7 +80,7 @@ function normalizeSegment(segment) {
  * 创建标记流分割器
  * @param {Object} options - 选项
  * @param {Array<string>} options.markers - 标记符数组（至少需要一个）
- * @returns {Object} 分割器对象 { push, flush, discardRemainder, getBuffer }
+ * @returns {Object} 分割器对象 { push, flush, discardRemainder }
  * @throws {Error} 如果没有提供有效的标记符
  *
  * 使用示例：
@@ -144,18 +144,9 @@ export function createMarkerStreamSplitter({ markers = [] } = {}) {
         buffer = '';
     }
 
-    /**
-     * 获取当前缓冲区内容（用于调试）
-     * @returns {string} 缓冲区内容
-     */
-    function getBuffer() {
-        return buffer;
-    }
-
     return {
         push,
         flush,
-        discardRemainder,
-        getBuffer
+        discardRemainder
     };
 }

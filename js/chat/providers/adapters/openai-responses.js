@@ -8,113 +8,12 @@
  * - 构建完整的 API 请求对象（endpoint、headers、body）
  *
  * 依赖：无
- * 被依赖：format-router.js
+ * 被依赖：openai-provider.js
  */
 
-/** 转换为修剪后的字符串 */
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
-/** 规范化 API URL（移除尾部斜杠） */
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || null;
-}
-
-/**
- * 构建端点 URL
- *
- * 如果 baseUrl 已经以 /responses 结尾，直接返回；否则追加该路径
- *
- * @param {string} baseUrl - 基础 URL
- * @returns {string} 完整的端点 URL
- */
-function buildEndpoint(baseUrl) {
-    return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
-}
-
-/**
- * 将图片对象转换为 Responses API 的图片 URL
- *
- * 支持的来源类型：
- * - url: 直接返回 URL
- * - data_url: 直接返回 data URL
- * - base64: 转换为 data URL 格式（需要 mimeType）
- *
- * @param {Object} image - 图片对象
- * @returns {string} 图片 URL
- * @throws {Error} 如果缺少必要字段
- */
-function toResponsesImageUrl(image) {
-    if (!image || typeof image !== 'object') {
-        throw new Error('OpenAI Responses image part is invalid.');
-    }
-
-    if (image.sourceType === 'url' || image.sourceType === 'data_url') {
-        return image.value;
-    }
-
-    if (image.sourceType === 'base64') {
-        if (!image.mimeType) {
-            throw new Error('OpenAI Responses base64 image part requires mimeType.');
-        }
-
-        return `data:${image.mimeType};base64,${image.value}`;
-    }
-
-    return '';
-}
-
-/**
- * 将本地消息 part 转换为 Responses API 的输入内容格式
- *
- * 支持的类型：
- * - text: 转换为 input_text
- * - image: 转换为 input_image（支持 file_id 或 image_url）
- *
- * @param {Object} part - 本地消息 part
- * @returns {Object|null} Responses API 格式的内容对象
- * @throws {Error} 如果图片格式不支持
- */
-function toInputContentPart(part, role) {
-    const normalizedRole = role === 'assistant' ? 'assistant' : 'user';
-
-    if (part.type === 'text') {
-        return {
-            type: normalizedRole === 'assistant' ? 'output_text' : 'input_text',
-            text: part.text
-        };
-    }
-
-    if (part.type === 'image') {
-        if (normalizedRole === 'assistant') {
-            throw new Error('OpenAI Responses assistant message does not support image parts.');
-        }
-
-        const contentPart = {
-            type: 'input_image'
-        };
-
-        if (part.image.sourceType === 'file_id') {
-            contentPart.file_id = part.image.value;
-        } else {
-            const imageUrl = toResponsesImageUrl(part.image);
-            if (!imageUrl) {
-                throw new Error(`OpenAI Responses does not support image sourceType "${part.image.sourceType}".`);
-            }
-            contentPart.image_url = imageUrl;
-        }
-
-        if (part.image.detail) {
-            contentPart.detail = part.image.detail;
-        }
-
-        return contentPart;
-    }
-
-    return null;
-}
+import { normalizeApiUrl } from '../../../shared/string-utils.js';
+import { toInputContentPart } from './responses-common.js';
+import { resolveResponsesEndpoint } from '../endpoint-resolver.js';
 
 /**
  * 构建 OpenAI Responses API 请求对象
@@ -144,23 +43,28 @@ export function buildOpenAiResponsesRequest({
         throw new Error('OpenAI API URL is required.');
     }
 
-    const endpoint = buildEndpoint(baseUrl);
+    const endpoint = resolveResponsesEndpoint(baseUrl);
     // 转换消息为 Responses API 的 input 格式
+    const apiProviderName = 'OpenAI Responses';
     const input = envelope.messages.map((message, messageIndex) => {
         const role = message.role === 'assistant' ? 'assistant' : 'user';
         const content = message.parts
-            .map((part) => toInputContentPart(part, role))
+            .map((part) => toInputContentPart(part, role, apiProviderName))
             .filter(Boolean);
 
         if (content.length === 0) {
             throw new Error(`OpenAI Responses message at index ${messageIndex} has empty content.`);
         }
 
-        return {
+        const item = {
             type: 'message',
             role,
             content
         };
+        if (role === 'assistant') {
+            item.status = 'completed';
+        }
+        return item;
     });
 
     const body = {
@@ -179,6 +83,10 @@ export function buildOpenAiResponsesRequest({
         body.reasoning = {
             effort: config.thinkingBudget
         };
+    }
+
+    if (config.searchEnabled === true) {
+        body.tools = [{ type: 'web_search' }];
     }
 
     return {

@@ -14,12 +14,17 @@ function createGeminiConfig(overrides = {}) {
         systemPrompt: 'You are a helpful assistant.',
         searchEnabled: false,
         thinkingLevel: null,
-        enablePseudoStream: true,
         ...overrides
     };
 }
 
-const contextMessages = [{ role: 'user', content: 'hello' }];
+const localMessageEnvelope = {
+    systemInstruction: 'You are a helpful assistant.',
+    messages: [{
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }]
+    }]
+};
 
 function createSseResponse(payloads, { errorAfterChunk = 0 } = {}) {
     const encoder = new TextEncoder();
@@ -91,7 +96,7 @@ test('gemini provider stream parses SSE and normalizes cumulative text payloads'
     const provider = createGeminiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectTextDeltas(provider.generateStream({
         config: createGeminiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -122,7 +127,7 @@ test('gemini provider stream falls back to backup key before first delta', async
     const provider = createGeminiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectTextDeltas(provider.generateStream({
         config: createGeminiConfig(),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onFallbackKey: () => {
             fallbackNoticeCount += 1;
@@ -165,7 +170,7 @@ test('gemini provider stream does not switch backup key after first delta', asyn
     await assert.rejects(
         collectTextDeltas(provider.generateStream({
             config: createGeminiConfig(),
-            contextMessages,
+            localMessageEnvelope,
             signal: new AbortController().signal
         })),
         /stream broken/
@@ -173,4 +178,3 @@ test('gemini provider stream does not switch backup key after first delta', asyn
 
     assert.deepEqual(apiKeys, ['primary-key']);
 });
-

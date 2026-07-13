@@ -13,17 +13,14 @@
  *   parts: [
  *     { type: 'text', text: '...' },
  *     { type: 'image', image: { sourceType: '...', value: '...', mimeType: '...', detail: '...' } }
- *   ],
- *   turnId: '...',
- *   meta: { ... }
+ *   ]
  * }
  *
  * 依赖：无
- * 被依赖：context-window, format-router, anthropic-provider
+ * 被依赖：message-model, context-window, provider adapters
  */
 
-// 有效的消息角色
-const LOCAL_MESSAGE_ROLES = new Set(['user', 'assistant']);
+import { asTrimmedString } from '../../shared/string-utils.js';
 
 // 有效的消息部分类型
 const LOCAL_PART_TYPES = new Set(['text', 'image']);
@@ -33,13 +30,6 @@ const IMAGE_SOURCE_TYPES = new Set(['url', 'data_url', 'base64', 'file_uri', 'fi
 
 // 图片细节级别（用于控制图片处理质量）
 const IMAGE_DETAIL_LEVELS = new Set(['low', 'high', 'auto']);
-
-/**
- * 将值转换为修剪后的字符串
- */
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
 
 /**
  * 规范化图片细节级别
@@ -75,11 +65,7 @@ function parseDataUrl(value) {
  * @returns {Object|null} 规范化后的文本部分 { type: 'text', text } 或 null（无效时）
  */
 function normalizeTextPart(part) {
-    const text = typeof part?.text === 'string'
-        ? part.text
-        : typeof part?.content === 'string'
-            ? part.content
-            : '';
+    const text = typeof part?.text === 'string' ? part.text : '';
     if (!text.trim()) {
         return null;
     }
@@ -103,7 +89,11 @@ function normalizeTextPart(part) {
  * - file_id: 文件 ID
  */
 function normalizeImagePart(part) {
-    const rawImage = part?.image && typeof part.image === 'object' ? part.image : part;
+    if (!part?.image || typeof part.image !== 'object') {
+        return null;
+    }
+
+    const rawImage = part.image;
     const sourceType = asTrimmedString(rawImage?.sourceType).toLowerCase();
     if (!IMAGE_SOURCE_TYPES.has(sourceType)) {
         return null;
@@ -189,132 +179,6 @@ export function normalizeLocalParts(parts) {
 }
 
 /**
- * 规范化消息角色
- * @param {*} role - 原始角色值
- * @returns {string} 规范化后的角色（'user'/'assistant'），无效时返回空字符串
- */
-function normalizeRole(role) {
-    const normalized = asTrimmedString(role).toLowerCase();
-    return LOCAL_MESSAGE_ROLES.has(normalized) ? normalized : '';
-}
-
-/**
- * 从旧格式消息中提取文本内容（兼容性处理）
- * @param {Object} rawMessage - 原始消息对象
- * @returns {string} 提取的文本内容
- */
-function extractLegacyText(rawMessage) {
-    if (typeof rawMessage?.content === 'string' && rawMessage.content.trim()) {
-        return rawMessage.content;
-    }
-
-    if (typeof rawMessage?.text === 'string' && rawMessage.text.trim()) {
-        return rawMessage.text;
-    }
-
-    return '';
-}
-
-/**
- * 规范化本地消息对象
- * @param {Object} rawMessage - 原始消息对象
- * @returns {Object|null} 规范化后的消息对象或 null（无效时）
- *
- * 规范化后的消息格式：
- * {
- *   role: 'user' | 'assistant',
- *   parts: [{ type: 'text', text } | { type: 'image', image: {...} }],
- *   turnId?: string,
- *   meta?: Object
- * }
- */
-export function normalizeLocalMessage(rawMessage) {
-    if (!rawMessage || typeof rawMessage !== 'object') {
-        return null;
-    }
-
-    const role = normalizeRole(rawMessage.role);
-    if (!role) {
-        return null;
-    }
-
-    let parts = normalizeLocalParts(rawMessage.parts);
-    if (parts.length === 0) {
-        const legacyText = extractLegacyText(rawMessage);
-        if (legacyText) {
-            parts = [{
-                type: 'text',
-                text: legacyText
-            }];
-        }
-    }
-
-    if (parts.length === 0) {
-        return null;
-    }
-
-    const normalized = {
-        role,
-        parts
-    };
-
-    const turnId = asTrimmedString(rawMessage.turnId);
-    if (turnId) {
-        normalized.turnId = turnId;
-    }
-
-    if (rawMessage.meta && typeof rawMessage.meta === 'object') {
-        normalized.meta = { ...rawMessage.meta };
-    }
-
-    return normalized;
-}
-
-/**
- * 规范化本地消息数组
- * @param {Array} messages - 原始消息数组
- * @returns {Array} 规范化后的消息数组（过滤掉无效消息）
- */
-export function normalizeLocalMessages(messages) {
-    if (!Array.isArray(messages)) {
-        return [];
-    }
-
-    return messages
-        .map((message) => normalizeLocalMessage(message))
-        .filter(Boolean);
-}
-
-/**
- * 构建本地消息信封（包含系统指令和消息列表）
- * @param {Object|Array} rawEnvelope - 原始信封对象或消息数组
- * @param {Object} options - 选项
- * @param {string} options.fallbackSystemInstruction - 备用系统指令
- * @returns {Object} 消息信封 { systemInstruction, messages }
- */
-export function buildLocalMessageEnvelope(rawEnvelope, {
-    fallbackSystemInstruction = ''
-} = {}) {
-    const envelopeCandidate = rawEnvelope && typeof rawEnvelope === 'object' && !Array.isArray(rawEnvelope)
-        ? rawEnvelope
-        : { messages: rawEnvelope };
-    const rawMessages = Array.isArray(envelopeCandidate.messages)
-        ? envelopeCandidate.messages
-        : Array.isArray(envelopeCandidate.contextMessages)
-            ? envelopeCandidate.contextMessages
-            : [];
-
-    const normalizedSystemInstruction = typeof envelopeCandidate.systemInstruction === 'string'
-        ? envelopeCandidate.systemInstruction.trim()
-        : asTrimmedString(fallbackSystemInstruction);
-
-    return {
-        systemInstruction: normalizedSystemInstruction,
-        messages: normalizeLocalMessages(rawMessages)
-    };
-}
-
-/**
  * 获取本地消息的纯文本内容
  * @param {Object} message - 本地消息对象
  * @param {Object} options - 选项
@@ -324,12 +188,7 @@ export function buildLocalMessageEnvelope(rawEnvelope, {
 export function getLocalMessageText(message, {
     imagePlaceholder = ''
 } = {}) {
-    const normalizedMessage = normalizeLocalMessage(message);
-    if (!normalizedMessage) {
-        return '';
-    }
-
-    const text = normalizedMessage.parts
+    const text = message.parts
         .map((part) => (part.type === 'text' ? part.text : ''))
         .filter((partText) => partText.trim())
         .join('\n\n');
@@ -342,7 +201,7 @@ export function getLocalMessageText(message, {
         return '';
     }
 
-    const hasImage = normalizedMessage.parts.some((part) => part.type === 'image');
+    const hasImage = message.parts.some((part) => part.type === 'image');
     return hasImage ? imagePlaceholder : '';
 }
 
@@ -352,12 +211,7 @@ export function getLocalMessageText(message, {
  * @returns {boolean} 是否包含图片
  */
 export function hasImageParts(message) {
-    const normalizedMessage = normalizeLocalMessage(message);
-    if (!normalizedMessage) {
-        return false;
-    }
-
-    return normalizedMessage.parts.some((part) => part.type === 'image');
+    return message.parts.some((part) => part.type === 'image');
 }
 
 /**

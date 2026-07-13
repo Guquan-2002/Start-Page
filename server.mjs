@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { createReadStream, existsSync, statSync } from 'node:fs';
-import { access, readFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -90,19 +90,6 @@ const server = createServer(async (request, response) => {
   try {
     await access(filePath);
   } catch {
-    if (request.headers.accept && request.headers.accept.includes('text/html')) {
-      const fallbackPath = path.join(ROOT_DIR, 'index.html');
-      try {
-        const content = await readFile(fallbackPath);
-        response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        response.end(content);
-        return;
-      } catch {
-        sendText(response, 404, 'Not Found');
-        return;
-      }
-    }
-
     sendText(response, 404, 'Not Found');
     return;
   }

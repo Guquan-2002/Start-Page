@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import {
     CHAT_PROVIDER_IDS,
-    applyProviderSearchConfig,
     getProviderDefinitions,
     getProviderIds,
     resolveProviderEndpoint
@@ -22,42 +21,6 @@ test('provider registry exposes definitions in provider order', () => {
         getProviderDefinitions().map((provider) => provider.id),
         getProviderIds()
     );
-});
-
-test('provider registry appends search tools without replacing existing tools', () => {
-    const body = {
-        tools: [{ type: 'existing_tool' }]
-    };
-
-    applyProviderSearchConfig(CHAT_PROVIDER_IDS.openaiResponses, body, {
-        searchEnabled: true
-    });
-
-    assert.deepEqual(body.tools, [
-        { type: 'existing_tool' },
-        { type: 'web_search' }
-    ]);
-});
-
-test('provider registry leaves search payload untouched when disabled', () => {
-    const body = {};
-
-    applyProviderSearchConfig(CHAT_PROVIDER_IDS.gemini, body, {
-        searchEnabled: false
-    });
-
-    assert.equal(body.tools, undefined);
-});
-
-test('provider registry leaves unsupported provider search payload untouched', () => {
-    const body = {};
-
-    applyProviderSearchConfig(CHAT_PROVIDER_IDS.deepseek, body, {
-        searchEnabled: true
-    });
-
-    assert.equal(body.tools, undefined);
-    assert.equal(body.web_search_options, undefined);
 });
 
 test('provider registry resolves provider endpoints', () => {

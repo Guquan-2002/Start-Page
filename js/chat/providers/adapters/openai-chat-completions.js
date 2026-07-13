@@ -8,31 +8,11 @@
  * - 构建完整的 API 请求对象（endpoint、headers、body）
  *
  * 依赖：无
- * 被依赖：format-router.js
+ * 被依赖：openai-provider.js, deepseek-chat-completions.js
  */
 
-/** 转换为修剪后的字符串 */
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
-/** 规范化 API URL（移除尾部斜杠） */
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || null;
-}
-
-/**
- * 构建端点 URL
- *
- * 如果 baseUrl 已经以 /chat/completions 结尾，直接返回；否则追加该路径
- *
- * @param {string} baseUrl - 基础 URL
- * @returns {string} 完整的端点 URL
- */
-function buildEndpoint(baseUrl) {
-    return baseUrl.endsWith('/chat/completions') ? baseUrl : `${baseUrl}/chat/completions`;
-}
+import { normalizeApiUrl } from '../../../shared/string-utils.js';
+import { resolveOpenAiChatEndpoint } from '../endpoint-resolver.js';
 
 /**
  * 确保图片 URL 值有效
@@ -152,7 +132,7 @@ export function buildOpenAiChatCompletionsRequest({
         throw new Error('OpenAI API URL is required.');
     }
 
-    const endpoint = buildEndpoint(baseUrl);
+    const endpoint = resolveOpenAiChatEndpoint(baseUrl);
     const messages = [];
 
     // 添加系统指令（作为第一条消息）
@@ -180,6 +160,10 @@ export function buildOpenAiChatCompletionsRequest({
     // 添加 Reasoning Effort 配置
     if (typeof config?.thinkingBudget === 'string' && config.thinkingBudget) {
         body.reasoning_effort = config.thinkingBudget;
+    }
+
+    if (config.searchEnabled === true) {
+        body.web_search_options = {};
     }
 
     return {

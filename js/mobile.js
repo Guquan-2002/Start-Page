@@ -105,7 +105,6 @@ export function initMobileEnhancements() {
     // 5. 优化触摸滚动
     const scrollableElements = [
         document.getElementById('chat-messages'),
-        document.getElementById('chat-history'),
         document.querySelector('.chat-settings-content')
     ];
 

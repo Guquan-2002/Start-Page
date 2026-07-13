@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createAttachmentManager, formatAttachmentNotice } from '../../js/chat/app/api-manager/attachments.js';
+import { createAttachmentManager, formatAttachmentNotice } from '../../js/chat/app/attachment-manager.js';
 
 function createEventTarget() {
     const listeners = new Map();
@@ -55,6 +55,32 @@ function createChatInput() {
     };
 }
 
+function createDomElement(tagName) {
+    return {
+        tagName,
+        children: [],
+        appendChild(child) {
+            this.children.push(child);
+            return child;
+        },
+        ...createEventTarget()
+    };
+}
+
+function createAttachmentsElement() {
+    const element = createDomElement('div');
+    Object.defineProperty(element, 'innerHTML', {
+        set() {
+            element.children = [];
+        }
+    });
+    return element;
+}
+
+globalThis.document = {
+    createElement: createDomElement
+};
+
 function createFileReaderMock() {
     return class MockFileReader {
         constructor() {
@@ -77,30 +103,33 @@ test('formatAttachmentNotice keeps singular/plural text', () => {
     assert.equal(formatAttachmentNotice(3), '已上传 3 张图片');
 });
 
-test('appendImageFiles and clearPendingImages keep attachment state in sync', async () => {
+test('image selection and clearPendingImages keep attachment state in sync', async () => {
     const originalFileReader = globalThis.FileReader;
     globalThis.FileReader = createFileReaderMock();
 
     try {
         const attachBtn = createAttachButton();
+        const imageInput = createImageInput();
+        const attachmentsEl = createAttachmentsElement();
         const manager = createAttachmentManager({
             elements: {
                 attachBtn,
-                imageInput: createImageInput(),
+                imageInput,
                 chatInput: createChatInput(),
-                attachmentsEl: null
+                attachmentsEl
             },
             ui: {
                 addSystemNotice() {}
             }
         });
 
-        manager.renderAttachmentPreview();
         assert.equal(attachBtn.title, 'Attach images');
 
-        await manager.appendImageFiles([{ type: 'image/png' }, { type: 'text/plain' }]);
+        imageInput.files = [{ type: 'image/png' }, { type: 'text/plain' }];
+        await imageInput.dispatch('change');
         assert.equal(manager.getPendingImageParts().length, 1);
         assert.equal(attachBtn.title, '已上传 1 张图片');
+        assert.equal(attachmentsEl.children[0].children[1].textContent, '×');
 
         manager.clearPendingImages();
         assert.equal(manager.getPendingImageParts().length, 0);
@@ -110,7 +139,7 @@ test('appendImageFiles and clearPendingImages keep attachment state in sync', as
     }
 });
 
-test('bindAttachmentEvents is idempotent and supports change/paste image inputs', async () => {
+test('attachment manager binds once during initialization and supports change/paste inputs', async () => {
     const originalFileReader = globalThis.FileReader;
     globalThis.FileReader = createFileReaderMock();
 
@@ -125,7 +154,7 @@ test('bindAttachmentEvents is idempotent and supports change/paste image inputs'
                 attachBtn,
                 imageInput,
                 chatInput,
-                attachmentsEl: null
+                attachmentsEl: createAttachmentsElement()
             },
             ui: {
                 addSystemNotice(message) {
@@ -133,9 +162,6 @@ test('bindAttachmentEvents is idempotent and supports change/paste image inputs'
                 }
             }
         });
-
-        manager.bindAttachmentEvents();
-        manager.bindAttachmentEvents();
 
         assert.equal(attachBtn.bindCount.get('click'), 1);
         assert.equal(imageInput.bindCount.get('change'), 1);
@@ -161,8 +187,8 @@ test('bindAttachmentEvents is idempotent and supports change/paste image inputs'
         });
         assert.equal(manager.getPendingImageParts().length, 2);
         assert.deepEqual(notices, []);
+        assert.deepEqual(Object.keys(manager).sort(), ['clearPendingImages', 'getPendingImageParts']);
     } finally {
         globalThis.FileReader = originalFileReader;
     }
 });
-

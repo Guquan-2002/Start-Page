@@ -9,10 +9,7 @@ import {
     NETWORK_ENDPOINTS
 } from './config.js';
 import { elements, checkConnectivity } from './utils.js';
-
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
+import { asTrimmedString } from './shared/string-utils.js';
 
 export function promptWeatherSetupIfNeeded() {
     if (!shouldPromptWeatherSetup()) return false;
@@ -25,7 +22,7 @@ export function promptWeatherSetupIfNeeded() {
     if (!weatherApiKey) return false;
 
     saveRuntimeConfig({ weatherApiKey });
-    window.alert('天气 API Key 已保存，页面即将刷新。');
+    window.alert('天气 API Key 已保存');
     window.location.reload();
     return true;
 }

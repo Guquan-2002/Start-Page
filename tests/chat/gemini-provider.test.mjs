@@ -14,12 +14,17 @@ function createGeminiConfig(overrides = {}) {
         systemPrompt: 'You are a helpful assistant.',
         searchEnabled: false,
         thinkingLevel: null,
-        enablePseudoStream: true,
         ...overrides
     };
 }
 
-const contextMessages = [{ role: 'user', content: 'hello' }];
+const localMessageEnvelope = {
+    systemInstruction: 'You are a helpful assistant.',
+    messages: [{
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }]
+    }]
+};
 
 test('gemini provider falls back to backup key when primary key fails', async () => {
     const apiKeys = [];
@@ -46,7 +51,7 @@ test('gemini provider falls back to backup key when primary key fails', async ()
     let fallbackNoticeCount = 0;
     const result = await provider.generate({
         config: createGeminiConfig(),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onFallbackKey: () => {
             fallbackNoticeCount += 1;
@@ -83,7 +88,7 @@ test('gemini provider retries transient fetch errors', async () => {
     const retryNotices = [];
     const result = await provider.generate({
         config: createGeminiConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onRetryNotice: (attempt, maxRetries, delayMs) => {
             retryNotices.push({ attempt, maxRetries, delayMs });
@@ -96,7 +101,7 @@ test('gemini provider retries transient fetch errors', async () => {
     assert.deepEqual(result.segments, ['retry ok']);
 });
 
-test('gemini provider injects marker rules and splits when pseudo stream is enabled', async () => {
+test('gemini provider injects marker rules and splits when streaming is enabled', async () => {
     let requestBody = null;
     const responseText = `alpha${ASSISTANT_SENTENCE_MARKER}beta${ASSISTANT_SEGMENT_MARKER}gamma`;
 
@@ -112,8 +117,8 @@ test('gemini provider injects marker rules and splits when pseudo stream is enab
 
     const provider = createGeminiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createGeminiConfig({ enablePseudoStream: true, backupApiKey: '' }),
-        contextMessages,
+        config: createGeminiConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -121,7 +126,7 @@ test('gemini provider injects marker rules and splits when pseudo stream is enab
     assert.deepEqual(result.segments, ['alpha', 'beta', 'gamma']);
 });
 
-test('gemini provider keeps marker text untouched when pseudo stream is disabled', async () => {
+test('gemini provider splits by markers by default', async () => {
     let requestBody = null;
     const responseText = `alpha${ASSISTANT_SENTENCE_MARKER}beta${ASSISTANT_SEGMENT_MARKER}gamma`;
 
@@ -137,16 +142,12 @@ test('gemini provider keeps marker text untouched when pseudo stream is disabled
 
     const provider = createGeminiProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createGeminiConfig({ enablePseudoStream: false, backupApiKey: '' }),
-        contextMessages,
+        config: createGeminiConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
-    assert.equal(
-        requestBody?.systemInstruction?.parts?.[0]?.text.includes(ASSISTANT_SENTENCE_MARKER),
-        false
-    );
-    assert.deepEqual(result.segments, [responseText]);
+    assert.deepEqual(result.segments, ['alpha', 'beta', 'gamma']);
 });
 
 test('gemini provider respects abort signal while waiting for retry delay', async () => {
@@ -163,7 +164,7 @@ test('gemini provider respects abort signal while waiting for retry delay', asyn
     await assert.rejects(
         provider.generate({
             config: createGeminiConfig({ backupApiKey: '' }),
-            contextMessages,
+            localMessageEnvelope,
             signal: controller.signal,
             onRetryNotice: () => {
                 controller.abort();
@@ -172,4 +173,3 @@ test('gemini provider respects abort signal while waiting for retry delay', asyn
         (error) => error?.name === 'AbortError'
     );
 });
-

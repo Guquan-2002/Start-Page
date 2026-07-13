@@ -1,59 +1,29 @@
 /**
- * Gemini GenerateContent API 适配�?
+ * Gemini GenerateContent API 适配器
  *
- * 职责�?
- * - 将标准化的本地消息格式转换为 Gemini GenerateContent API 的请求格�?
- * - 处理图片的多种来源类型（data_url、base64、file_uri�?
+ * 职责：
+ * - 将标准化的本地消息格式转换为 Gemini GenerateContent API 的请求格式
+ * - 处理图片的多种来源类型（data_url、base64、file_uri）
  * - 支持 Thinking Level 功能
- * - 构建完整�?API 请求对象（endpoint、headers、body�?
+ * - 构建完整的 API 请求对象（endpoint、headers、body）
  *
  * 依赖：local-message.js（图片数据解析）
- * 被依赖：format-router.js
+ * 被依赖：gemini-provider.js
  */
 import { parseImageDataUrl } from '../../core/local-message.js';
-
-/** 转换为修剪后的字符串 */
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
-/** 规范�?API URL（移除尾部斜杠） */
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || null;
-}
+import { normalizeApiUrl } from '../../../shared/string-utils.js';
+import { resolveGeminiEndpoint } from '../endpoint-resolver.js';
 
 /**
- * 构建 Gemini API 端点 URL
- *
- * 根据是否启用流式响应，构建不同的端点�?
- * - 流式�?models/{model}:streamGenerateContent?alt=sse
- * - 非流式：/models/{model}:generateContent
- *
- * @param {string} baseUrl - 基础 URL
- * @param {string} model - 模型名称
- * @param {boolean} stream - 是否启用流式响应
- * @returns {string} 完整的端�?URL
- */
-function buildEndpoint(baseUrl, model, stream) {
-    const encodedModel = encodeURIComponent(model);
-    if (stream) {
-        return `${baseUrl}/models/${encodedModel}:streamGenerateContent?alt=sse`;
-    }
-
-    return `${baseUrl}/models/${encodedModel}:generateContent`;
-}
-
-/**
- * 将本地消�?part 转换�?Gemini 格式
+ * 将本地消息 part 转换为 Gemini 格式
  *
  * 支持的类型：
  * - text: 文本内容
- * - image: 图片（支�?data_url、base64、file_uri 三种来源�?
+ * - image: 图片（支持 data_url、base64、file_uri 三种来源）
  *
  * @param {Object} part - 本地消息 part
- * @returns {Object|null} Gemini 格式�?part 对象
- * @throws {Error} 如果图片格式不支�?
+ * @returns {Object|null} Gemini 格式的 part 对象
+ * @throws {Error} 如果图片格式不支持
  */
 function toGeminiPart(part) {
     if (part.type === 'text') {
@@ -113,11 +83,11 @@ function toGeminiPart(part) {
 /**
  * 构建 Gemini GenerateContent API 请求对象
  *
- * 算法�?
+ * 算法：
  * 1. 验证并规范化 API URL
- * 2. 转换消息格式（将 parts 转换�?Gemini 格式，role 映射�?user/model�?
+ * 2. 转换消息格式（将 parts 转换为 Gemini 格式，role 映射为 user/model）
  * 3. 添加系统指令、Thinking Budget 等可选配置
- * 4. 构建完整的端�?URL（包含模型名称和流式参数�?
+ * 4. 构建完整的端点 URL（包含模型名称和流式参数）
  *
  * @param {Object} options - 构建选项
  * @param {Object} options.config - Provider 配置
@@ -167,8 +137,12 @@ export function buildGeminiGenerateContentRequest({
         };
     }
 
+    if (config.searchEnabled === true) {
+        body.tools = [{ google_search: {} }];
+    }
+
     return {
-        endpoint: buildEndpoint(baseUrl, config.model, stream),
+        endpoint: resolveGeminiEndpoint(baseUrl, config.model, stream),
         headers: {
             'Content-Type': 'application/json',
             'x-goog-api-key': apiKey

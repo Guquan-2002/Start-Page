@@ -7,15 +7,7 @@ function isStorageLike(storage) {
 }
 
 function resolveStorage(storage) {
-    if (isStorageLike(storage)) {
-        return storage;
-    }
-
-    if (typeof localStorage !== 'undefined' && isStorageLike(localStorage)) {
-        return localStorage;
-    }
-
-    return null;
+    return isStorageLike(storage) ? storage : null;
 }
 
 export function safeGetJson(key, fallbackValue, storage = null) {
@@ -44,20 +36,6 @@ export function safeSetJson(key, value, storage = null) {
 
     try {
         targetStorage.setItem(key, JSON.stringify(value));
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-export function safeRemoveItem(key, storage = null) {
-    const targetStorage = resolveStorage(storage);
-    if (!targetStorage || typeof targetStorage.removeItem !== 'function') {
-        return false;
-    }
-
-    try {
-        targetStorage.removeItem(key);
         return true;
     } catch {
         return false;

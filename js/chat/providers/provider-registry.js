@@ -6,6 +6,14 @@
  * registry free of network/client imports.
  */
 
+import { asTrimmedString, normalizeApiUrl } from '../../shared/string-utils.js';
+import {
+    resolveAnthropicEndpoint,
+    resolveGeminiEndpoint,
+    resolveOpenAiChatEndpoint,
+    resolveResponsesEndpoint
+} from './endpoint-resolver.js';
+
 export const CHAT_PROVIDER_IDS = Object.freeze({
     gemini: 'gemini',
     openai: 'openai',
@@ -20,61 +28,28 @@ const DEFAULT_PROVIDER_ID = CHAT_PROVIDER_IDS.gemini;
 const COMMON_CHAT_DEFAULTS = Object.freeze({
     systemPrompt: 'You are a helpful assistant.',
     searchEnabled: false,
-    enablePseudoStream: true,
-    enableDraftAutosave: true,
+    enableMarkerSplit: true,
     prefixWithTime: false,
     prefixWithName: false,
     userName: 'User'
 });
 
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeApiUrl(apiUrl) {
-    return asTrimmedString(apiUrl).replace(/\/+$/, '');
-}
-
-function appendEndpointPath(baseUrl, pathSuffix) {
-    if (!baseUrl) {
-        return '(missing apiUrl)';
-    }
-
-    return baseUrl.endsWith(pathSuffix) ? baseUrl : `${baseUrl}${pathSuffix}`;
-}
-
-function cloneConfig(config) {
-    return { ...config };
-}
-
 function buildOpenAiChatEndpoint(config) {
-    return appendEndpointPath(normalizeApiUrl(config?.apiUrl), '/chat/completions');
+    return resolveOpenAiChatEndpoint(normalizeApiUrl(config?.apiUrl));
 }
 
 function buildResponsesEndpoint(config) {
-    return appendEndpointPath(normalizeApiUrl(config?.apiUrl), '/responses');
+    return resolveResponsesEndpoint(normalizeApiUrl(config?.apiUrl));
 }
 
 function buildAnthropicEndpoint(config) {
-    return appendEndpointPath(normalizeApiUrl(config?.apiUrl), '/messages');
+    return resolveAnthropicEndpoint(normalizeApiUrl(config?.apiUrl));
 }
 
 function buildGeminiEndpoint(config, useStreaming) {
     const baseUrl = normalizeApiUrl(config?.apiUrl);
     const model = asTrimmedString(config?.model);
-    if (!baseUrl || !model) {
-        return baseUrl || '(missing apiUrl)';
-    }
-
-    const endpointSuffix = useStreaming
-        ? ':streamGenerateContent?alt=sse'
-        : ':generateContent';
-    return `${baseUrl}/models/${encodeURIComponent(model)}${endpointSuffix}`;
-}
-
-function addBodyTools(body, tools) {
-    const existingTools = Array.isArray(body.tools) ? body.tools : [];
-    body.tools = [...existingTools, ...tools];
+    return resolveGeminiEndpoint(baseUrl, model, useStreaming);
 }
 
 const OPENAI_REASONING = Object.freeze({
@@ -109,10 +84,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         }),
         search: Object.freeze({
             label: 'Web Search (Gemini)',
-            note: 'Gemini uses Google Search grounding.',
-            apply(body) {
-                addBodyTools(body, [{ google_search: {} }]);
-            }
+            note: 'Gemini uses Google Search grounding.'
         }),
         resolveEndpoint: buildGeminiEndpoint
     }),
@@ -135,10 +107,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         reasoning: OPENAI_REASONING,
         search: Object.freeze({
             label: 'Web Search (OpenAI Completions)',
-            note: 'OpenAI Chat Completions uses basic web_search_options.',
-            apply(body) {
-                body.web_search_options = {};
-            }
+            note: 'OpenAI Chat Completions uses basic web_search_options.'
         }),
         resolveEndpoint: buildOpenAiChatEndpoint
     }),
@@ -161,10 +130,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         reasoning: OPENAI_REASONING,
         search: Object.freeze({
             label: 'Web Search (OpenAI Responses)',
-            note: 'OpenAI Responses uses the basic web_search tool.',
-            apply(body) {
-                addBodyTools(body, [{ type: 'web_search' }]);
-            }
+            note: 'OpenAI Responses uses the basic web_search tool.'
         }),
         resolveEndpoint: buildResponsesEndpoint
     }),
@@ -192,8 +158,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         }),
         search: Object.freeze({
             label: 'Web Search (DeepSeek)',
-            note: 'DeepSeek Chat Completions does not expose a built-in web search tool in the documented API.',
-            supported: false
+            note: 'DeepSeek Chat Completions uses basic web_search_options.'
         }),
         resolveEndpoint: buildOpenAiChatEndpoint
     }),
@@ -221,10 +186,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         }),
         search: Object.freeze({
             label: 'Web Search (Ark)',
-            note: 'Ark uses the built-in web_search tool.',
-            apply(body) {
-                addBodyTools(body, [{ type: 'web_search' }]);
-            }
+            note: 'Ark uses the built-in web_search tool.'
         }),
         resolveEndpoint: buildResponsesEndpoint
     }),
@@ -252,13 +214,7 @@ export const PROVIDER_REGISTRY = Object.freeze({
         }),
         search: Object.freeze({
             label: 'Web Search (Anthropic)',
-            note: 'Anthropic uses the built-in web_search tool.',
-            apply(body) {
-                addBodyTools(body, [{
-                    type: 'web_search_20250305',
-                    name: 'web_search'
-                }]);
-            }
+            note: 'Anthropic uses the built-in web_search tool.'
         }),
         resolveEndpoint: buildAnthropicEndpoint
     })
@@ -273,13 +229,7 @@ export const PROVIDER_ORDER = Object.freeze([
     CHAT_PROVIDER_IDS.anthropic
 ]);
 
-export const GEMINI_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.gemini].defaults;
-export const OPENAI_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.openai].defaults;
-export const OPENAI_RESPONSES_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.openaiResponses].defaults;
-export const DEEPSEEK_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.deepseek].defaults;
-export const ARK_RESPONSES_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.arkResponses].defaults;
-export const ANTHROPIC_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.anthropic].defaults;
-export const CHAT_DEFAULTS = GEMINI_DEFAULTS;
+export const CHAT_DEFAULTS = PROVIDER_REGISTRY[CHAT_PROVIDER_IDS.gemini].defaults;
 
 export function normalizeProviderId(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -292,10 +242,6 @@ export function isSupportedProviderId(value) {
 export function resolveProviderId(value, fallbackProviderId = DEFAULT_PROVIDER_ID) {
     const normalized = normalizeProviderId(value);
     return isSupportedProviderId(normalized) ? normalized : fallbackProviderId;
-}
-
-export function getDefaultProviderId() {
-    return DEFAULT_PROVIDER_ID;
 }
 
 export function getProviderIds() {
@@ -312,7 +258,7 @@ export function getProviderDefinition(providerId) {
 
 export function getProviderDefaults(providerId) {
     const definition = getProviderDefinition(resolveProviderId(providerId));
-    return cloneConfig(definition.defaults);
+    return { ...definition.defaults };
 }
 
 export function getProviderLabel(providerId) {
@@ -331,23 +277,10 @@ export function getProviderSearchConfig(providerId) {
     return getProviderDefinition(resolveProviderId(providerId))?.search || null;
 }
 
-export function applyProviderSearchConfig(providerId, body, config) {
-    if (config?.searchEnabled !== true) {
-        return body;
-    }
-
-    const searchConfig = getProviderSearchConfig(providerId);
-    if (typeof searchConfig?.apply === 'function') {
-        searchConfig.apply(body);
-    }
-
-    return body;
-}
-
 export function resolveProviderEndpoint(config, useStreaming = false) {
     const providerId = normalizeProviderId(config?.provider);
     const definition = getProviderDefinition(providerId);
-    if (!definition || typeof definition.resolveEndpoint !== 'function') {
+    if (typeof definition?.resolveEndpoint !== 'function') {
         return normalizeApiUrl(config?.apiUrl) || '(unknown endpoint)';
     }
 

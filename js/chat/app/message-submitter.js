@@ -6,42 +6,21 @@
  * - Build user messages with prefix/timestamp/image parts
  * - Append user messages and trigger assistant response generation
  */
-import { createChatMessage, createTurnId, getMessageDisplayContent } from '../../core/message-model.js';
-import { applyMessagePrefix, buildMessagePrefix, buildTimestampPrefix } from '../../core/prefix.js';
-import { getProviderLabel } from '../../providers/provider-registry.js';
-import { formatAttachmentNotice } from './attachments.js';
-
-function resizeInputToContent(chatInput) {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
-}
+import { createChatMessage, createTurnId } from '../core/message-model.js';
+import { applyMessagePrefix, buildNamePrefix, buildTimestampPrefix } from '../core/prefix.js';
+import { getProviderLabel } from '../providers/provider-registry.js';
+import { formatAttachmentNotice } from './attachment-manager.js';
 
 export function createMessageSubmitter({
     store,
     ui,
     configManager,
     chatInput,
-    settingsDiv,
+    openSettings,
     attachments,
     generateAssistantResponse,
-    onConversationUpdated = null,
-    onUserMessageAccepted = null
+    onUserMessageAccepted
 }) {
-    function notifyConversationUpdated() {
-        if (typeof onConversationUpdated === 'function') {
-            onConversationUpdated();
-        }
-    }
-
-    function appendMessagesToUi(messages) {
-        messages.forEach((message) => {
-            ui.addMessage(message.role, getMessageDisplayContent(message), message.meta, {
-                messageId: message.id,
-                turnId: message.turnId
-            });
-        });
-    }
-
     async function sendMessage() {
         const text = chatInput.value.trim();
         if (store.isStreaming()) {
@@ -59,29 +38,22 @@ export function createMessageSubmitter({
 
         if (!config.apiKey && !config.backupApiKey) {
             ui.addMessage('error', `Please set at least one ${providerLabel} API key in settings.`);
-            settingsDiv.classList.remove('chat-settings-hidden');
+            openSettings();
             return;
         }
 
         if (!config.model) {
             ui.addMessage('error', `Please set a ${providerLabel} model name in settings.`);
-            settingsDiv.classList.remove('chat-settings-hidden');
+            openSettings();
             return;
         }
 
-        const activeSessionId = store.getActiveSessionId();
-        if (typeof onUserMessageAccepted === 'function') {
-            onUserMessageAccepted({
-                sessionId: activeSessionId,
-                text
-            });
-        }
+        onUserMessageAccepted();
 
-        const userCreatedAt = Date.now();
         const turnId = createTurnId();
 
-        const timestampPrefix = buildTimestampPrefix(config, userCreatedAt);
-        const userNamePrefix = buildMessagePrefix(config);
+        const timestampPrefix = buildTimestampPrefix(config, Date.now());
+        const userNamePrefix = buildNamePrefix(config);
         const userContextText = text
             ? applyMessagePrefix(text, userNamePrefix)
             : (userNamePrefix || '');
@@ -89,7 +61,7 @@ export function createMessageSubmitter({
         if (text) {
             parts.push({
                 type: 'text',
-                text: userContextText || text
+                text: userContextText
             });
         }
         if (!text && hasImages && userContextText) {
@@ -101,7 +73,7 @@ export function createMessageSubmitter({
         if (hasImages) {
             parts.push(...pendingImageParts);
         }
-        const contentFallback = text || (hasImages ? '[Image]' : '');
+        const contentFallback = text || (hasImages ? '[图片]' : '');
         const displayContent = text
             ? userContextText
             : (
@@ -120,10 +92,8 @@ export function createMessageSubmitter({
                 metaOptions: {
                     displayContent: timestampPrefix,
                     contextContent: timestampPrefix,
-                    createdAt: userCreatedAt,
                     displayRole: 'system',
-                    isPrefixMessage: true,
-                    prefixType: 'timestamp'
+                    isPrefixMessage: true
                 }
             }));
         }
@@ -135,18 +105,16 @@ export function createMessageSubmitter({
             metaOptions: {
                 displayContent,
                 contextContent: userContextText || contentFallback,
-                parts,
-                createdAt: userCreatedAt
+                parts
             }
         }));
 
         store.appendMessages(messagesToAppend);
-        appendMessagesToUi(messagesToAppend);
-        notifyConversationUpdated();
+        ui.appendChatMessages(messagesToAppend);
 
         chatInput.value = '';
         attachments.clearPendingImages();
-        resizeInputToContent(chatInput);
+        ui.resizeInput();
 
         await generateAssistantResponse(config, turnId, text);
     }

@@ -3,73 +3,11 @@
  * Converts normalized local messages into Ark Responses request payload.
  */
 
+import { normalizeApiUrl } from '../../../shared/string-utils.js';
+import { toInputContentPart } from './responses-common.js';
+import { resolveResponsesEndpoint } from '../endpoint-resolver.js';
+
 const ARK_THINKING_LEVELS = new Set(['minimal', 'low', 'medium', 'high']);
-
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
-}
-
-function normalizeApiUrl(apiUrl) {
-    const trimmed = asTrimmedString(apiUrl).replace(/\/+$/, '');
-    return trimmed || null;
-}
-
-function buildEndpoint(baseUrl) {
-    return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
-}
-
-function toResponsesImageUrl(image) {
-    if (!image || typeof image !== 'object') {
-        throw new Error('Ark Responses image part is invalid.');
-    }
-
-    if (image.sourceType === 'url' || image.sourceType === 'data_url') {
-        return image.value;
-    }
-
-    if (image.sourceType === 'base64') {
-        if (!image.mimeType) {
-            throw new Error('Ark Responses base64 image part requires mimeType.');
-        }
-
-        return `data:${image.mimeType};base64,${image.value}`;
-    }
-
-    return '';
-}
-
-function toInputContentPart(part) {
-    if (part.type === 'text') {
-        return {
-            type: 'input_text',
-            text: part.text
-        };
-    }
-
-    if (part.type === 'image') {
-        const contentPart = {
-            type: 'input_image'
-        };
-
-        if (part.image.sourceType === 'file_id') {
-            contentPart.file_id = part.image.value;
-        } else {
-            const imageUrl = toResponsesImageUrl(part.image);
-            if (!imageUrl) {
-                throw new Error(`Ark Responses does not support image sourceType "${part.image.sourceType}".`);
-            }
-            contentPart.image_url = imageUrl;
-        }
-
-        if (part.image.detail) {
-            contentPart.detail = part.image.detail;
-        }
-
-        return contentPart;
-    }
-
-    return null;
-}
 
 export function buildArkResponsesRequest({
     config,
@@ -82,14 +20,21 @@ export function buildArkResponsesRequest({
         throw new Error('Ark API URL is required.');
     }
 
-    const endpoint = buildEndpoint(baseUrl);
-    const input = envelope.messages.map((message) => ({
-        type: 'message',
-        role: message.role === 'assistant' ? 'assistant' : 'user',
-        content: message.parts
-            .map((part) => toInputContentPart(part))
-            .filter(Boolean)
-    }));
+    const endpoint = resolveResponsesEndpoint(baseUrl);
+    const input = envelope.messages.map((message) => {
+        const role = message.role === 'assistant' ? 'assistant' : 'user';
+        const item = {
+            type: 'message',
+            role,
+            content: message.parts
+                .map((part) => toInputContentPart(part, role, 'Ark'))
+                .filter(Boolean)
+        };
+        if (role === 'assistant') {
+            item.status = 'completed';
+        }
+        return item;
+    });
 
     const body = {
         model: config.model,
@@ -111,6 +56,10 @@ export function buildArkResponsesRequest({
         body.reasoning = {
             effort: thinkingBudget
         };
+    }
+
+    if (config.searchEnabled === true) {
+        body.tools = [{ type: 'web_search' }];
     }
 
     return {

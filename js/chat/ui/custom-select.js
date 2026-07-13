@@ -8,15 +8,8 @@
 
 /**
  * Initialize a custom select for the given native <select> element.
- * Returns a small API { closeMenu, syncFromSelect, rebuildOptions } or null.
  */
-export function initCustomSelect(selectEl) {
-    if (!selectEl) return null;
-    if (selectEl.dataset.customSelectReady === '1' && selectEl._customSelectApi) {
-        return selectEl._customSelectApi;
-    }
-
-    selectEl.dataset.customSelectReady = '1';
+function initCustomSelect(selectEl) {
     selectEl.classList.add('chat-native-select-hidden');
 
     const wrapper = document.createElement('div');
@@ -51,7 +44,7 @@ export function initCustomSelect(selectEl) {
         btn.type = 'button';
         btn.className = 'chat-custom-select-option';
         btn.dataset.value = option.value;
-        btn.textContent = option.textContent || '';
+        btn.textContent = option.textContent;
         btn.setAttribute('role', 'option');
         btn.disabled = option.disabled;
         return btn;
@@ -71,8 +64,8 @@ export function initCustomSelect(selectEl) {
 
     function syncFromSelect() {
         const options = Array.from(selectEl.options);
-        const selectedOption = selectEl.selectedOptions[0] || options[0] || null;
-        label.textContent = selectedOption ? (selectedOption.textContent || '') : '';
+        const selectedOption = selectEl.selectedOptions[0] || options[0];
+        label.textContent = selectedOption?.textContent || '';
         for (const optionButton of optionButtons) {
             const isSelected = optionButton.dataset.value === selectEl.value;
             optionButton.classList.toggle('is-selected', isSelected);
@@ -122,7 +115,7 @@ export function initCustomSelect(selectEl) {
     menu.addEventListener('click', (event) => {
         const optionButton = event.target.closest('.chat-custom-select-option');
         if (!optionButton || optionButton.disabled) return;
-        commitValue(optionButton.dataset.value || '');
+        commitValue(optionButton.dataset.value);
         closeMenu();
         trigger.focus();
     });
@@ -143,7 +136,7 @@ export function initCustomSelect(selectEl) {
         }
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault();
-            commitValue(optionButton.dataset.value || '');
+            commitValue(optionButton.dataset.value);
             closeMenu();
             trigger.focus();
         }
@@ -156,9 +149,7 @@ export function initCustomSelect(selectEl) {
     // Initial build
     rebuildOptions();
 
-    const api = { closeMenu, syncFromSelect, rebuildOptions };
-    selectEl._customSelectApi = api;
-    return api;
+    selectEl._customSelectApi = { rebuildOptions };
 }
 
 /**
@@ -166,10 +157,9 @@ export function initCustomSelect(selectEl) {
  * If the select was not initialized yet, initialize it.
  */
 export function refreshCustomSelect(selectEl) {
-    if (!selectEl) return false;
-    if (selectEl._customSelectApi && typeof selectEl._customSelectApi.rebuildOptions === 'function') {
+    if (selectEl._customSelectApi) {
         selectEl._customSelectApi.rebuildOptions();
-        return true;
+        return;
     }
-    return !!initCustomSelect(selectEl);
+    initCustomSelect(selectEl);
 }

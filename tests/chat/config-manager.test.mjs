@@ -19,65 +19,25 @@ function createMemoryStorage() {
     };
 }
 
-function createField(initialValue = '', {
-    type = 'text',
-    emulateNumberType = false,
-    allowedValues = null
-} = {}) {
+function createField(initialValue = '') {
     const listeners = new Map();
-    const attributes = new Map();
-    const allowed = Array.isArray(allowedValues)
-        ? new Set(allowedValues.map((value) => String(value ?? '')))
-        : null;
-    let fieldType = type;
     let currentValue = String(initialValue);
-
-    function normalizeValue(nextValue) {
-        const value = String(nextValue ?? '');
-        if (allowed && !allowed.has(value)) {
-            return '';
-        }
-
-        if (!emulateNumberType || fieldType !== 'number') {
-            return value;
-        }
-
-        if (!value) {
-            return '';
-        }
-
-        return Number.isFinite(Number(value)) ? value : '';
-    }
 
     return {
         get value() {
             return currentValue;
         },
         set value(nextValue) {
-            currentValue = normalizeValue(nextValue);
-        },
-        get type() {
-            return fieldType;
-        },
-        set type(nextType) {
-            fieldType = String(nextType || 'text');
-            currentValue = normalizeValue(currentValue);
+            currentValue = String(nextValue ?? '');
         },
         checked: false,
+        disabled: false,
+        placeholder: '',
+        textContent: '',
         addEventListener(eventName, handler) {
             const handlers = listeners.get(eventName) || [];
             handlers.push(handler);
             listeners.set(eventName, handlers);
-        },
-        setAttribute(name, value) {
-            attributes.set(String(name), String(value ?? ''));
-        },
-        getAttribute(name) {
-            const key = String(name);
-            return attributes.has(key) ? attributes.get(key) : null;
-        },
-        removeAttribute(name) {
-            attributes.delete(String(name));
         },
         dispatchEvent(event) {
             const handlers = listeners.get(event?.type) || [];
@@ -86,21 +46,67 @@ function createField(initialValue = '', {
     };
 }
 
+function createSelect(initialValue = '') {
+    const select = createField(initialValue);
+    let options = [];
+    let rebuildCount = 0;
+
+    Object.defineProperties(select, {
+        options: {
+            get() {
+                return options;
+            }
+        },
+        selectedOptions: {
+            get() {
+                const selected = options.find((option) => option.value === select.value);
+                return selected ? [selected] : [];
+            }
+        },
+        customSelectRebuildCount: {
+            get() {
+                return rebuildCount;
+            }
+        }
+    });
+
+    select.replaceChildren = (...nextOptions) => {
+        options = nextOptions;
+        if (!options.some((option) => option.value === select.value)) {
+            select.value = options[0]?.value || '';
+        }
+    };
+    select._customSelectApi = {
+        rebuildOptions() {
+            rebuildCount += 1;
+        }
+    };
+
+    return select;
+}
+
+globalThis.document = {
+    createElement(tagName) {
+        assert.equal(tagName, 'option');
+        return { value: '', textContent: '', disabled: false };
+    }
+};
+
 function createElements() {
     return {
-        cfgProvider: createField('gemini'),
+        cfgProvider: createSelect('gemini'),
         cfgUrl: createField(''),
         cfgKey: createField(''),
         cfgBackupKey: createField(''),
         cfgModel: createField(''),
         cfgPrompt: createField(''),
-        cfgThinkingLevel: createField('', {
-            type: 'text',
-            emulateNumberType: true
-        }),
+        cfgThinkingLevel: createSelect(''),
+        cfgThinkingLabel: createField(''),
+        cfgThinkingNote: createField(''),
         cfgSearchEnabled: { checked: false },
-        cfgEnablePseudoStream: { checked: true },
-        cfgEnableDraftAutosave: { checked: true },
+        cfgSearchLabel: createField(''),
+        cfgSearchNote: createField(''),
+        cfgEnableStreaming: { checked: true },
         cfgPrefixWithTime: { checked: false },
         cfgPrefixWithName: { checked: false },
         cfgUserName: createField('User')
@@ -114,6 +120,11 @@ test('config manager keeps provider profiles and search toggles when switching',
     const elements = createElements();
     const manager = createConfigManager(elements, 'llm_chat_config');
     manager.loadConfig();
+
+    assert.deepEqual(
+        elements.cfgProvider.options.map((option) => option.value),
+        ['gemini', 'openai', 'openai_responses', 'deepseek', 'ark_responses', 'anthropic']
+    );
 
     elements.cfgProvider.value = 'gemini';
     elements.cfgUrl.value = 'https://generativelanguage.googleapis.com/v1beta';
@@ -259,28 +270,46 @@ test('config manager keeps provider profiles and search toggles when switching',
     assert.equal(saved.profiles.anthropic.searchEnabled, true);
 });
 
-test('config manager ignores old flat config fields and falls back to provider defaults', () => {
+test('config manager requires provider profiles and uses defaults when absent', () => {
     const storage = createMemoryStorage();
     globalThis.localStorage = storage;
     storage.setItem('llm_chat_config', JSON.stringify({
         provider: 'openai',
-        apiUrl: 'https://legacy.example/v1',
-        apiKey: 'legacy-key',
-        model: 'legacy-model'
+        apiUrl: 'https://unsupported.example/api',
+        apiKey: 'unsupported-key',
+        model: 'unsupported-model'
     }));
 
     const elements = createElements();
     const manager = createConfigManager(elements, 'llm_chat_config');
     manager.loadConfig();
 
-    assert.equal(elements.cfgProvider.value, 'openai');
-    assert.equal(elements.cfgUrl.value, 'https://api.openai.com/v1');
+    assert.equal(elements.cfgProvider.value, 'gemini');
+    assert.equal(elements.cfgUrl.value, 'https://generativelanguage.googleapis.com/v1beta');
     assert.equal(elements.cfgKey.value, '');
-    assert.equal(elements.cfgModel.value, 'gpt-5');
+    assert.equal(elements.cfgModel.value, 'gemini-3-pro-preview');
     assert.equal(elements.cfgSearchEnabled.checked, false);
 });
 
-test('config manager keeps pending thinking value when option list is not ready', () => {
+test('config manager keeps an intentionally blank canonical profile field', () => {
+    const storage = createMemoryStorage();
+    globalThis.localStorage = storage;
+
+    const elements = createElements();
+    const manager = createConfigManager(elements, 'llm_chat_config');
+    manager.loadConfig();
+    elements.cfgModel.value = '';
+
+    assert.equal(manager.getConfig().model, '');
+    manager.saveConfig();
+
+    const reloadedElements = createElements();
+    const reloadedManager = createConfigManager(reloadedElements, 'llm_chat_config');
+    reloadedManager.loadConfig();
+    assert.equal(reloadedElements.cfgModel.value, '');
+});
+
+test('config manager builds provider presentation before applying the stored profile', () => {
     const storage = createMemoryStorage();
     globalThis.localStorage = storage;
     storage.setItem('llm_chat_config', JSON.stringify({
@@ -295,13 +324,18 @@ test('config manager keeps pending thinking value when option list is not ready'
     }));
 
     const elements = createElements();
-    elements.cfgThinkingLevel = createField('', {
-        allowedValues: ['']
-    });
-
     const manager = createConfigManager(elements, 'llm_chat_config');
     manager.loadConfig();
 
-    assert.equal(elements.cfgThinkingLevel.value, '');
-    assert.equal(elements.cfgThinkingLevel.getAttribute('data-pending-thinking-value'), 'minimal');
+    assert.equal(elements.cfgProvider.value, 'openai');
+    assert.deepEqual(
+        elements.cfgThinkingLevel.options.map((option) => option.value),
+        ['', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh']
+    );
+    assert.equal(elements.cfgThinkingLevel.value, 'minimal');
+    assert.equal(elements.cfgThinkingLabel.textContent, 'Reasoning (optional)');
+    assert.equal(elements.cfgThinkingNote.textContent.includes('xhigh'), true);
+    assert.equal(elements.cfgSearchLabel.textContent, 'Web Search (OpenAI Completions)');
+    assert.equal(elements.cfgUrl.placeholder, 'https://api.openai.com/v1');
+    assert.equal(elements.cfgThinkingLevel.customSelectRebuildCount > 0, true);
 });

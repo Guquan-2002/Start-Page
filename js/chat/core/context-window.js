@@ -5,29 +5,16 @@
  * - 根据 Token 和消息数量限制裁剪对话历史
  * - 规范化历史消息为统一格式（支持文本和多模态消息）
  * - 构建适配不同 Provider 的上下文窗口
- * - 提供上下文预览功能
  * - 智能截断超长消息以适应 Token 预算
  *
  * 依赖：message-model.js, local-message.js
- * 被依赖：api-manager, provider-router
+ * 被依赖：assistant-response
  */
 
 // Context window builder: trims and normalizes history to fit model token/message budgets.
-import { estimateTokenCount, getContextMessageContent, stripSourcesSection } from './message-model.js';
-import { getLocalMessageText, hasImageParts, normalizeLocalMessage } from './local-message.js';
-
-// 图片在上下文中的占位符文本
-const IMAGE_CONTEXT_PLACEHOLDER = '[image]';
-
-/**
- * 规范化最大上下文消息数
- * @param {*} value - 原始值
- * @returns {number|null} 有效的正整数或 null
- */
-export function normalizeMaxContextMessages(value) {
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
+import { CJK_CHAR_REGEX } from '../../shared/string-utils.js';
+import { estimateTokenCount, getContextMessageContent } from './message-model.js';
+import { getLocalMessageText } from './local-message.js';
 
 /**
  * 将内容截断到指定的 Token 预算
@@ -35,63 +22,34 @@ export function normalizeMaxContextMessages(value) {
  * @param {number} maxTokens - 最大 Token 数
  * @returns {string} 截断后的内容
  *
- * 算法：使用二分查找找到最大可用长度，确保截断后的内容不超过 Token 限制
+ * 算法：增量扫描，逐字符累计 CJK/non-CJK 计数，
+ * 使用与 estimateTokenCount 相同的公式（含 Math.ceil）检查预算。
+ * 相比二分查找（O(n log n)）更简单、更快（O(n)），
+ * 且 token 估算本身已是近似值，二分查找的额外精度无实际收益。
  */
-export function truncateContentToTokenBudget(content, maxTokens) {
-    if (!content || !Number.isFinite(maxTokens) || maxTokens <= 0) {
+function truncateContentToTokenBudget(content, maxTokens) {
+    if (!content || maxTokens <= 0) {
         return '';
     }
 
-    let low = 0;
-    let high = content.length;
-    let best = '';
+    const overheadTokens = 4;
+    let cjkChars = 0;
+    let nonCjkChars = 0;
+    let splitIndex = 0;
 
-    while (low <= high) {
-        const middle = Math.floor((low + high) / 2);
-        const candidate = content.slice(0, middle);
-        const tokenCount = estimateTokenCount(candidate) + 4;
+    const cjkRegex = new RegExp(CJK_CHAR_REGEX.source, 'u');
 
-        if (tokenCount <= maxTokens) {
-            best = candidate;
-            low = middle + 1;
-        } else {
-            high = middle - 1;
+    for (let i = 0; i < content.length; i++) {
+        cjkRegex.test(content[i]) ? cjkChars++ : nonCjkChars++;
+
+        const tokens = Math.ceil(cjkChars / 1.5 + nonCjkChars / 4) + overheadTokens;
+        if (tokens > maxTokens) {
+            break;
         }
+        splitIndex = i + 1;
     }
 
-    return best.trim();
-}
-
-/**
- * 规范化对话历史为上下文格式（纯文本格式）
- * @param {Array} conversationHistory - 原始对话历史
- * @returns {Array} 规范化后的消息数组 [{ role, content, turnId }]
- *
- * 处理逻辑：
- * - 只保留 user 和 assistant 角色的消息
- * - 移除 assistant 消息中的 Sources 部分
- * - 过滤掉空内容的消息
- */
-export function normalizeHistoryForContext(conversationHistory) {
-    if (!Array.isArray(conversationHistory)) {
-        return [];
-    }
-
-    return conversationHistory
-        .filter((message) => message?.role === 'user' || message?.role === 'assistant')
-        .map((message) => {
-            const rawText = getContextMessageContent(message);
-            const content = message.role === 'assistant'
-                ? stripSourcesSection(rawText).trim()
-                : rawText.trim();
-
-            return {
-                role: message.role,
-                content,
-                turnId: message.turnId
-            };
-        })
-        .filter((message) => message.content.length > 0);
+    return content.slice(0, splitIndex).trim();
 }
 
 /**
@@ -100,78 +58,75 @@ export function normalizeHistoryForContext(conversationHistory) {
  * @returns {Array} 规范化后的本地消息数组
  *
  * 处理逻辑：
- * - 只保留 user 和 assistant 角色的消息
- * - 尝试从 meta.parts 中恢复多模态内容
- * - 移除 assistant 消息中的 Sources 部分
- * - 使用 normalizeLocalMessage 进行规范化
+ * - 优先使用消息中的多模态 parts
  */
-export function normalizeHistoryForLocalMessages(conversationHistory) {
+function normalizeHistoryForLocalMessages(conversationHistory) {
     if (!Array.isArray(conversationHistory)) {
-        return [];
+        throw new TypeError('Conversation history must be an array.');
     }
 
     return conversationHistory
-        .filter((message) => message?.role === 'user' || message?.role === 'assistant')
         .map((message) => {
             const rawText = getContextMessageContent(message);
-            const fallbackText = message.role === 'assistant'
-                ? stripSourcesSection(rawText).trim()
-                : rawText.trim();
+            const fallbackText = rawText.trim();
 
-            return normalizeLocalMessage({
+            const parts = Array.isArray(message?.meta?.parts) && message.meta.parts.length > 0
+                ? message.meta.parts
+                : [{ type: 'text', text: fallbackText }];
+
+            return {
                 role: message.role,
-                turnId: message.turnId,
-                parts: Array.isArray(message?.meta?.parts) ? message.meta.parts : undefined,
-                content: fallbackText,
-                meta: message?.meta
-            });
-        })
-        .filter(Boolean);
+                parts
+            };
+        });
 }
 
 /**
  * 估算本地消息的 Token 数量
  * @param {Object} message - 本地消息对象
+ * @param {number} tokenPerImage - 每张图片的保守 Token 估算值
  * @returns {number} 估算的 Token 数量（包含 4 个 Token 的消息开销）
  */
-function estimateLocalMessageTokens(message) {
-    const text = getLocalMessageText(message, {
-        imagePlaceholder: IMAGE_CONTEXT_PLACEHOLDER
-    });
-    return estimateTokenCount(text) + 4;
+function estimateLocalMessageTokens(message, tokenPerImage) {
+    const imageCount = message.parts.filter((part) => part.type === 'image').length;
+    const imageCost = imageCount * tokenPerImage;
+    const text = getLocalMessageText(message);
+    return estimateTokenCount(text) + imageCost + 4;
 }
 
 /**
  * 将本地消息截断到指定的 Token 预算
  * @param {Object} message - 本地消息对象
  * @param {number} maxTokens - 最大 Token 数
+ * @param {number} tokenPerImage - 每张图片的保守 Token 估算值
  * @returns {Object|null} 截断后的消息或 null
  *
  * 截断策略：
  * - 如果消息已在预算内，直接返回
- * - 保留所有图片部分
- * - 截断文本部分以适应剩余预算
+ * - 保留所有图片部分（图片代表用户意图，不可丢弃）
+ * - 截断文本部分以适应剩余预算（扣除实际图片 Token 后的空间）
+ * - 如果图片就已超出预算，仍保留全部图片但不保留文本
  * - 如果截断后无内容，返回 null
  */
-function truncateLocalMessageToTokenBudget(message, maxTokens) {
-    const normalizedMessage = normalizeLocalMessage(message);
-    if (!normalizedMessage || !Number.isFinite(maxTokens) || maxTokens <= 0) {
+function truncateLocalMessageToTokenBudget(message, maxTokens, tokenPerImage) {
+    if (maxTokens <= 0) {
         return null;
     }
 
-    const messageTokenCount = estimateLocalMessageTokens(normalizedMessage);
+    const messageTokenCount = estimateLocalMessageTokens(message, tokenPerImage);
     if (messageTokenCount <= maxTokens) {
-        return normalizedMessage;
+        return message;
     }
 
-    const plainText = getLocalMessageText(normalizedMessage);
-    const imageOnlyCost = hasImageParts(normalizedMessage)
-        ? estimateTokenCount(IMAGE_CONTEXT_PLACEHOLDER) + 4
-        : 0;
-    const textBudget = Math.max(1, maxTokens - imageOnlyCost);
-    const truncatedText = truncateContentToTokenBudget(plainText, textBudget);
+    const imageCount = message.parts.filter((part) => part.type === 'image').length;
+    const imageCost = imageCount * tokenPerImage;
+    const plainText = getLocalMessageText(message);
+    const textBudget = Math.max(0, maxTokens - imageCost);
+    const truncatedText = textBudget > 0
+        ? truncateContentToTokenBudget(plainText, textBudget)
+        : '';
 
-    const truncatedParts = normalizedMessage.parts.filter((part) => part.type === 'image');
+    const truncatedParts = message.parts.filter((part) => part.type === 'image');
     if (truncatedText) {
         truncatedParts.push({
             type: 'text',
@@ -184,159 +139,55 @@ function truncateLocalMessageToTokenBudget(message, maxTokens) {
     }
 
     return {
-        ...normalizedMessage,
+        ...message,
         parts: truncatedParts
     };
 }
 
 /**
- * 规范化系统指令
- * @param {Object} config - 配置对象
- * @returns {string} 规范化后的系统指令
+ * Build normalized local-message envelope from conversation history.
+ *
+ * System instruction is NOT included here — it is owned by the provider
+ * runtime (providers/system-instruction.js) which may enrich it with
+ * marker-protocol instructions.
+ *
+ * @param {Array} conversationHistory - Conversation history
+ * @param {Object} config - Configuration object (systemPrompt used for logging only)
+ * @param {Object} options
+ * @param {number} options.maxContextTokens - Max context tokens (default 200000)
+ * @param {number} options.maxContextMessages - Max context messages (default 120)
+ * @returns {{ messages: Array, isTrimmed: boolean, tokenCount: number, inputBudgetTokens: number, maxContextMessages: number }}
  */
-function normalizeSystemInstruction(config) {
-    if (typeof config?.systemPrompt !== 'string') {
-        return '';
-    }
-
-    return config.systemPrompt.trim();
-}
-
-/**
- * 构建上下文窗口（纯文本格式）
- * @param {Array} conversationHistory - 对话历史
- * @param {number} maxContextTokens - 最大上下文 Token 数
- * @param {number} maxContextMessages - 最大上下文消息数
- * @returns {Object} 上下文窗口对象
- *
- * 返回格式：
- * {
- *   messages: Array,           // 选中的消息列表
- *   isTrimmed: boolean,        // 是否进行了裁剪
- *   tokenCount: number,        // 实际使用的 Token 数
- *   inputBudgetTokens: number, // 输入预算 Token 数
- *   maxContextMessages: number // 最大消息数限制
- * }
- *
- * 裁剪策略：
- * 1. 先按消息数量限制裁剪（保留最新的 N 条消息）
- * 2. 再按 Token 预算裁剪（从最新消息开始向前选择）
- * 3. 为输出预留 20% 的 Token（最少 1024）
- * 4. 如果最新消息超出预算，截断该消息以保留用户意图
- */
-export function buildContextWindow(conversationHistory, maxContextTokens, maxContextMessages) {
-    const normalizedHistory = normalizeHistoryForContext(conversationHistory);
-    const safeMaxMessages = normalizeMaxContextMessages(maxContextMessages);
-
-    let candidateHistory = normalizedHistory;
-    let isTrimmed = false;
-
-    if (safeMaxMessages && normalizedHistory.length > safeMaxMessages) {
-        candidateHistory = normalizedHistory.slice(-safeMaxMessages);
-        isTrimmed = true;
-    }
-
-    const safeMaxTokens = Number.isFinite(maxContextTokens) && maxContextTokens > 0
-        ? maxContextTokens
-        : 200000;
-
-    if (!candidateHistory.length) {
-        return {
-            messages: [],
-            isTrimmed,
-            tokenCount: 0,
-            inputBudgetTokens: safeMaxTokens,
-            maxContextMessages: safeMaxMessages
-        };
-    }
-
-    const reserveOutputTokens = Math.max(1024, Math.floor(safeMaxTokens * 0.2));
-    const inputBudgetTokens = Math.max(1024, safeMaxTokens - reserveOutputTokens);
-
-    const selected = [];
-    let usedTokens = 0;
-
-    for (let index = candidateHistory.length - 1; index >= 0; index -= 1) {
-        const message = candidateHistory[index];
-        const messageTokens = estimateTokenCount(message.content) + 4;
-        const exceedsBudget = usedTokens + messageTokens > inputBudgetTokens;
-
-        if (exceedsBudget) {
-            isTrimmed = true;
-
-            // Keep a truncated version of the newest message so the latest intent survives.
-            if (selected.length === 0) {
-                const truncatedContent = truncateContentToTokenBudget(message.content, inputBudgetTokens);
-                if (truncatedContent) {
-                    selected.push({ ...message, content: truncatedContent });
-                    usedTokens = estimateTokenCount(truncatedContent) + 4;
-                }
-            }
-
-            break;
-        }
-
-        selected.push(message);
-        usedTokens += messageTokens;
-    }
-
-    return {
-        messages: selected.reverse(),
-        isTrimmed,
-        tokenCount: usedTokens,
-        inputBudgetTokens,
-        maxContextMessages: safeMaxMessages
-    };
-}
-
-/**
- * 构建本地消息信封（支持多模态）
- * @param {Array} conversationHistory - 对话历史
- * @param {Object} config - 配置对象（包含 systemPrompt 等）
- * @param {Object} options - 选项
- * @param {number} options.maxContextTokens - 最大上下文 Token 数（默认 200000）
- * @param {number} options.maxContextMessages - 最大上下文消息数（默认 120）
- * @returns {Object} 本地消息信封对象
- *
- * 返回格式：
- * {
- *   systemInstruction: string, // 系统指令
- *   messages: Array,           // 本地消息列表（支持多模态）
- *   isTrimmed: boolean,        // 是否进行了裁剪
- *   tokenCount: number,        // 实际使用的 Token 数
- *   inputBudgetTokens: number, // 输入预算 Token 数
- *   maxContextMessages: number // 最大消息数限制
- * }
- *
- * 裁剪策略：与 buildContextWindow 相同，但支持多模态消息
- */
-export function buildLocalMessageEnvelope(conversationHistory, config = {}, {
+export function buildContextEnvelope(conversationHistory, config = {}, {
     maxContextTokens = 200000,
-    maxContextMessages = 120
+    maxContextMessages = 120,
+    tokenPerImage = 2000
 } = {}) {
     const normalizedHistory = normalizeHistoryForLocalMessages(conversationHistory);
-    const safeMaxMessages = normalizeMaxContextMessages(maxContextMessages);
+    if (!Number.isInteger(maxContextMessages) || maxContextMessages <= 0) {
+        throw new RangeError('maxContextMessages must be a positive integer.');
+    }
+    if (!Number.isFinite(maxContextTokens) || maxContextTokens <= 0) {
+        throw new RangeError('maxContextTokens must be a positive number.');
+    }
 
     let candidateHistory = normalizedHistory;
     let isTrimmed = false;
 
-    if (safeMaxMessages && normalizedHistory.length > safeMaxMessages) {
-        candidateHistory = normalizedHistory.slice(-safeMaxMessages);
+    if (normalizedHistory.length > maxContextMessages) {
+        candidateHistory = normalizedHistory.slice(-maxContextMessages);
         isTrimmed = true;
     }
 
-    const safeMaxTokens = Number.isFinite(maxContextTokens) && maxContextTokens > 0
-        ? maxContextTokens
-        : 200000;
+    const safeMaxTokens = maxContextTokens;
 
     if (!candidateHistory.length) {
         return {
-            systemInstruction: normalizeSystemInstruction(config),
             messages: [],
             isTrimmed,
             tokenCount: 0,
             inputBudgetTokens: safeMaxTokens,
-            maxContextMessages: safeMaxMessages
+            maxContextMessages
         };
     }
 
@@ -348,7 +199,7 @@ export function buildLocalMessageEnvelope(conversationHistory, config = {}, {
 
     for (let index = candidateHistory.length - 1; index >= 0; index -= 1) {
         const message = candidateHistory[index];
-        const messageTokens = estimateLocalMessageTokens(message);
+        const messageTokens = estimateLocalMessageTokens(message, tokenPerImage);
         const exceedsBudget = usedTokens + messageTokens > inputBudgetTokens;
 
         if (exceedsBudget) {
@@ -356,10 +207,10 @@ export function buildLocalMessageEnvelope(conversationHistory, config = {}, {
 
             // Keep a truncated version of the newest message so the latest intent survives.
             if (selected.length === 0) {
-                const truncatedMessage = truncateLocalMessageToTokenBudget(message, inputBudgetTokens);
+                const truncatedMessage = truncateLocalMessageToTokenBudget(message, inputBudgetTokens, tokenPerImage);
                 if (truncatedMessage) {
                     selected.push(truncatedMessage);
-                    usedTokens = estimateLocalMessageTokens(truncatedMessage);
+                    usedTokens = estimateLocalMessageTokens(truncatedMessage, tokenPerImage);
                 }
             }
 
@@ -371,49 +222,10 @@ export function buildLocalMessageEnvelope(conversationHistory, config = {}, {
     }
 
     return {
-        systemInstruction: normalizeSystemInstruction(config),
         messages: selected.reverse(),
         isTrimmed,
         tokenCount: usedTokens,
         inputBudgetTokens,
-        maxContextMessages: safeMaxMessages
+        maxContextMessages
     };
-}
-
-/**
- * 构建上下文预览（用于调试和展示）
- * @param {Array} messages - 消息列表
- * @param {number} previewChars - 预览字符数（默认 80）
- * @returns {Array} 预览对象数组
- *
- * 返回格式：
- * [{ index, role, turnId, preview }]
- */
-export function buildContextPreview(messages, previewChars = 80) {
-    return messages.map((message, index) => {
-        const rawText = typeof message?.content === 'string'
-            ? message.content
-            : getLocalMessageText(message, { imagePlaceholder: IMAGE_CONTEXT_PLACEHOLDER });
-        const singleLine = rawText.replace(/\s+/g, ' ').trim();
-        const text = singleLine.length > previewChars
-            ? `${singleLine.slice(0, previewChars)}...`
-            : singleLine;
-
-        return {
-            index,
-            role: message.role,
-            turnId: message.turnId,
-            preview: text
-        };
-    });
-}
-
-/**
- * 构建本地消息上下文预览（别名函数）
- * @param {Array} messages - 本地消息列表
- * @param {number} previewChars - 预览字符数（默认 80）
- * @returns {Array} 预览对象数组
- */
-export function buildLocalContextPreview(messages, previewChars = 80) {
-    return buildContextPreview(messages, previewChars);
 }

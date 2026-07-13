@@ -90,35 +90,6 @@
     min-width: 0;
 }
 
-#chat-page-link {
-    width: 30px;
-    height: 30px;
-    border-radius: 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-color);
-    opacity: 0.7;
-    text-decoration: none;
-    transition: opacity 0.2s, background 0.2s;
-}
-
-#chat-page-link:hover {
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.1);
-}
-
-#chat-page-link:focus-visible {
-    outline: none;
-    opacity: 1;
-    background: rgba(255, 255, 255, 0.12);
-    box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.35);
-}
-
-body.chat-page #chat-page-link {
-    display: none;
-}
-
 #chat-header-actions {
     display: flex;
     gap: 6px;
@@ -468,174 +439,19 @@ body.chat-page #chat-page-link {
     filter: brightness(1.05);
 }
 
-/* History panel */
-#chat-history {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 40vh;
-    overflow-y: auto;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--chat-border);
-    flex-shrink: 0;
-    opacity: 1;
-    transform: scaleY(1);
-    transform-origin: top;
-    will-change: transform, opacity;
-    transition: opacity 0.2s ease, transform 0.2s ease, max-height 0.2s ease, padding 0.2s ease;
-}
-
-#chat-history.chat-history-hidden {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    border-bottom: none;
-    opacity: 0;
-    transform: scaleY(0);
-    overflow: hidden;
-    pointer-events: none;
-}
-
-#chat-history-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 4px;
-    font-size: 0.85rem;
-    font-weight: 600;
-}
-
-#chat-history-actions {
-    display: flex;
-    gap: 4px;
-}
-
-#chat-new-session-btn,
-#chat-clear-all-btn {
-    border: none;
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--text-color);
-    font-size: 0.8rem;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-#chat-new-session-btn {
-    background: rgba(100, 140, 255, 0.2);
-}
-
-#chat-new-session-btn:hover {
-    background: rgba(100, 140, 255, 0.35);
-}
-
-#chat-clear-all-btn {
-    background: rgba(255, 80, 80, 0.2);
-}
-
-#chat-clear-all-btn:hover {
-    background: rgba(255, 80, 80, 0.35);
-}
-
-#chat-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.history-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.05);
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.history-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.history-item.active {
-    background: rgba(100, 140, 255, 0.25);
-}
-
-.history-item-title {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    cursor: pointer;
-}
-
-.history-item-title:hover {
-    color: rgba(100, 140, 255, 0.8);
-}
-
-.history-item-title-input {
-    flex: 1;
-    border: 1px solid rgba(100, 140, 255, 0.5);
-    border-radius: 4px;
-    padding: 4px 8px;
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-color);
-    font-size: 0.85rem;
-    outline: none;
-}
-
-.history-item-actions {
-    display: flex;
-    gap: 4px;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.history-item:hover .history-item-actions {
-    opacity: 1;
-}
-
-.history-item-edit,
-.history-item-delete {
-    border: none;
-    border-radius: 4px;
-    background: none;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.75rem;
-    cursor: pointer;
-    padding: 4px 6px;
-    transition: all 0.2s;
-}
-
-.history-item-edit:hover {
-    background: rgba(100, 140, 255, 0.3);
-    color: #fff;
-}
-
-.history-item-delete:hover {
-    background: rgba(255, 60, 60, 0.3);
-    color: #fff;
-}
-
-#chat-history::-webkit-scrollbar,
 #chat-messages::-webkit-scrollbar {
     width: 5px;
 }
 
-#chat-history::-webkit-scrollbar-track,
 #chat-messages::-webkit-scrollbar-track {
     background: transparent;
 }
 
-#chat-history::-webkit-scrollbar-thumb,
 #chat-messages::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.15);
     border-radius: 4px;
 }
 
-#chat-history::-webkit-scrollbar-thumb:hover,
 #chat-messages::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
@@ -765,11 +581,6 @@ body.chat-page #chat-page-link {
 
 .chat-msg.assistant.is-interrupted {
     border: 1px dashed rgba(255, 255, 255, 0.28);
-}
-
-.chat-msg.typing::after {
-    content: '...';
-    animation: blink 0.8s step-end infinite;
 }
 
 .chat-user-images {
@@ -1087,36 +898,6 @@ body.chat-page #chat-page-link {
     transform: scale(1.05);
 }
 
-/* Loading and trim notices */
-.chat-loading {
-    display: inline-flex;
-    gap: 4px;
-    padding: 4px 0;
-}
-
-.chat-loading span {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
-    animation: dot-bounce 1.2s ease-in-out infinite;
-}
-
-.chat-loading span:nth-child(2) {
-    animation-delay: 0.15s;
-}
-
-.chat-loading span:nth-child(3) {
-    animation-delay: 0.3s;
-}
-
-.chat-trimmed-notice {
-    align-self: center;
-    padding: 4px 12px;
-    font-size: 0.75rem;
-    opacity: 0.55;
-}
-
 /* Mobile adjustments */
 @media (max-width: 768px) {
     /* 聊天按钮移动端优化 */
@@ -1141,12 +922,6 @@ body.chat-page #chat-page-link {
 
     #chat-title {
         font-size: 1.1rem;
-    }
-
-    #chat-page-link {
-        width: 36px;
-        height: 36px;
-        font-size: 0.95rem;
     }
 
     #chat-header-actions button {
@@ -1174,17 +949,6 @@ body.chat-page #chat-page-link {
     #chat-settings select {
         font-size: 16px; /* 防止iOS自动缩放 */
         padding: 12px 14px;
-    }
-
-    /* 历史记录面板优化 */
-    #chat-history {
-        max-height: 35vh;
-        padding: 10px 12px;
-    }
-
-    .history-item {
-        padding: 10px 12px;
-        font-size: 0.9rem;
     }
 
     /* 消息列表优化 */
@@ -1278,12 +1042,6 @@ body.chat-page #chat-page-link {
         font-size: 1rem;
     }
 
-    #chat-page-link {
-        width: 34px;
-        height: 34px;
-        font-size: 0.9rem;
-    }
-
     #chat-header-actions button {
         padding: 5px 8px;
         font-size: 0.9rem;
@@ -1312,10 +1070,6 @@ body.chat-page #chat-page-link {
 
 /* 横屏模式优化 */
 @media (max-width: 768px) and (orientation: landscape) {
-    #chat-history {
-        max-height: 30vh;
-    }
-
     #chat-input {
         max-height: 80px;
     }
@@ -1327,13 +1081,6 @@ body.chat-page #chat-page-link {
     #chat-header-actions button {
         min-width: 36px;
         min-height: 36px;
-    }
-
-    .history-item-edit,
-    .history-item-delete {
-        min-width: 32px;
-        min-height: 32px;
-        padding: 6px 8px;
     }
 
     /* 移除悬停效果，使用点击效果 */

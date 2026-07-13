@@ -1,156 +1,37 @@
 /**
  * Chat settings manager.
  *
- * Stores the current profiles schema only: provider + profiles[providerId].
+ * Owns the current provider profiles schema and all provider-specific form UI.
+ *
+ * Normalization logic is in config/config-normalizer.js (pure, no DOM);
+ * this module stays focused on DOM coordination, storage I/O, and wiring.
  */
-import { CHAT_DEFAULTS } from '../constants.js';
+import { CHAT_DEFAULTS } from '../providers/provider-registry.js';
 import {
-    getProviderDefaults,
-    getProviderIds,
+    getProviderDefinitions,
+    getProviderPlaceholders,
+    getProviderSearchConfig,
     getProviderThinkingConfig,
     resolveProviderId
 } from '../providers/provider-registry.js';
 import { safeGetJson, safeSetJson } from '../../shared/safe-storage.js';
-import { normalizeFromUi, formatForUi } from './thinking-config.js';
+import { refreshCustomSelect } from '../ui/custom-select.js';
+import {
+    buildDefaultProfiles,
+    normalizeReasoningField,
+    normalizeStoredConfig,
+    normalizeStoredProfile
+} from '../config/config-normalizer.js';
 
-const SUPPORTED_PROVIDER_IDS = getProviderIds();
-const PENDING_THINKING_VALUE_ATTR = 'data-pending-thinking-value';
-
-function parseBoolean(rawValue, fallback = false) {
-    if (typeof rawValue === 'boolean') return rawValue;
-    if (typeof rawValue === 'string') {
-        if (rawValue === 'true') return true;
-        if (rawValue === 'false') return false;
-    }
-    return fallback;
+function createOption(value, label) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    return option;
 }
 
-function normalizeNameField(rawValue, fallback) {
-    return typeof rawValue === 'string' ? rawValue.trim() : fallback;
-}
-
-function normalizeProvider(rawValue) {
-    return resolveProviderId(rawValue, CHAT_DEFAULTS.provider);
-}
-
-function normalizeReasoningValue(provider, rawValue) {
-    return normalizeFromUi(provider, typeof rawValue === 'string' ? rawValue : '').value;
-}
-
-function setPendingThinkingValue(field, value) {
-    if (!field) return;
-    const normalized = typeof value === 'string' ? value : '';
-    if (typeof field.setAttribute === 'function') {
-        field.setAttribute(PENDING_THINKING_VALUE_ATTR, normalized);
-        return;
-    }
-    if (!field.dataset || typeof field.dataset !== 'object') {
-        field.dataset = {};
-    }
-    field.dataset.pendingThinkingValue = normalized;
-}
-
-function normalizeProviderProfile(provider, rawProfile = {}, fallbackProfile = null) {
-    const defaults = getProviderDefaults(provider);
-    const fallback = fallbackProfile || defaults;
-    const thinkingConfig = getProviderThinkingConfig(provider);
-    const thinkingField = thinkingConfig?.field || 'thinkingBudget';
-    const rawThinkingValue = Object.prototype.hasOwnProperty.call(rawProfile, thinkingField)
-        ? rawProfile[thinkingField]
-        : fallback?.[thinkingField];
-
-    return {
-        apiUrl: typeof rawProfile.apiUrl === 'string' && rawProfile.apiUrl.trim()
-            ? rawProfile.apiUrl.trim()
-            : fallback.apiUrl,
-        apiKey: typeof rawProfile.apiKey === 'string'
-            ? rawProfile.apiKey.trim()
-            : (fallback.apiKey || ''),
-        backupApiKey: typeof rawProfile.backupApiKey === 'string'
-            ? rawProfile.backupApiKey.trim()
-            : (fallback.backupApiKey || ''),
-        model: typeof rawProfile.model === 'string' && rawProfile.model.trim()
-            ? rawProfile.model.trim()
-            : (fallback.model || ''),
-        searchEnabled: parseBoolean(rawProfile.searchEnabled, fallback.searchEnabled === true),
-        [thinkingField]: normalizeReasoningValue(provider, rawThinkingValue)
-    };
-}
-
-function createDefaultProfiles() {
-    return Object.fromEntries(
-        SUPPORTED_PROVIDER_IDS.map((providerId) => [
-            providerId,
-            normalizeProviderProfile(providerId, getProviderDefaults(providerId))
-        ])
-    );
-}
-
-function cloneProfiles(profiles) {
-    return JSON.parse(JSON.stringify(profiles || {}));
-}
-
-function readRawProfiles(raw) {
-    if (raw && typeof raw.profiles === 'object' && raw.profiles) return raw.profiles;
-    return {};
-}
-
-function getProfileReasoningValue(provider, profile) {
-    const thinkingField = getProviderThinkingConfig(provider)?.field || 'thinkingBudget';
-    return Object.prototype.hasOwnProperty.call(profile, thinkingField) ? profile[thinkingField] : null;
-}
-
-function toRuntimeConfig(provider, profiles, raw = {}) {
-    const activeProfile = profiles[provider];
-    const thinkingField = getProviderThinkingConfig(provider)?.field || 'thinkingBudget';
-
-    return {
-        provider,
-        profiles,
-        apiUrl: activeProfile.apiUrl,
-        apiKey: activeProfile.apiKey,
-        backupApiKey: activeProfile.backupApiKey,
-        model: activeProfile.model,
-        thinkingBudget: thinkingField === 'thinkingBudget' ? getProfileReasoningValue(provider, activeProfile) : null,
-        thinkingLevel: thinkingField === 'thinkingLevel' ? getProfileReasoningValue(provider, activeProfile) : null,
-        thinkingEffort: thinkingField === 'thinkingEffort' ? getProfileReasoningValue(provider, activeProfile) : null,
-        searchEnabled: activeProfile.searchEnabled === true,
-        systemPrompt: typeof raw.systemPrompt === 'string' ? raw.systemPrompt : CHAT_DEFAULTS.systemPrompt,
-        enablePseudoStream: parseBoolean(raw.enablePseudoStream, CHAT_DEFAULTS.enablePseudoStream),
-        enableDraftAutosave: parseBoolean(raw.enableDraftAutosave, CHAT_DEFAULTS.enableDraftAutosave),
-        prefixWithTime: parseBoolean(raw.prefixWithTime, CHAT_DEFAULTS.prefixWithTime),
-        prefixWithName: parseBoolean(raw.prefixWithName, CHAT_DEFAULTS.prefixWithName),
-        userName: normalizeNameField(raw.userName, CHAT_DEFAULTS.userName)
-    };
-}
-
-function normalizeStoredConfig(raw) {
-    const provider = normalizeProvider(raw?.provider);
-    const rawProfiles = readRawProfiles(raw);
-    const defaultProfiles = createDefaultProfiles();
-    const profiles = {};
-
-    SUPPORTED_PROVIDER_IDS.forEach((providerId) => {
-        const rawProfile = rawProfiles?.[providerId] && typeof rawProfiles[providerId] === 'object'
-            ? rawProfiles[providerId]
-            : {};
-        profiles[providerId] = normalizeProviderProfile(providerId, rawProfile, defaultProfiles[providerId]);
-    });
-
-    return toRuntimeConfig(provider, profiles, raw || {});
-}
-
-function toStoredConfig(config) {
-    return {
-        provider: config.provider,
-        profiles: cloneProfiles(config.profiles),
-        systemPrompt: config.systemPrompt,
-        enablePseudoStream: config.enablePseudoStream,
-        enableDraftAutosave: config.enableDraftAutosave,
-        prefixWithTime: config.prefixWithTime,
-        prefixWithName: config.prefixWithName,
-        userName: config.userName
-    };
+function replaceOptions(select, options) {
+    select.replaceChildren(...options.map(({ value, label }) => createOption(value, label)));
 }
 
 export function createConfigManager(elements, storageKey) {
@@ -162,97 +43,157 @@ export function createConfigManager(elements, storageKey) {
         cfgModel,
         cfgPrompt,
         cfgThinkingLevel,
+        cfgThinkingLabel,
+        cfgThinkingNote,
         cfgSearchEnabled,
-        cfgEnablePseudoStream,
-        cfgEnableDraftAutosave,
+        cfgSearchLabel,
+        cfgSearchNote,
         cfgPrefixWithTime,
         cfgPrefixWithName,
         cfgUserName
     } = elements;
 
     let activeProvider = CHAT_DEFAULTS.provider;
-    let profiles = createDefaultProfiles();
+    let profiles = buildDefaultProfiles();
 
-    function readProviderFields(provider) {
-        const normalizedThinking = normalizeFromUi(provider, cfgThinkingLevel ? cfgThinkingLevel.value : '');
-        return normalizeProviderProfile(provider, {
-            apiUrl: cfgUrl.value,
-            apiKey: cfgKey.value,
-            backupApiKey: cfgBackupKey.value,
-            model: cfgModel.value,
-            searchEnabled: cfgSearchEnabled ? cfgSearchEnabled.checked === true : false,
-            [normalizedThinking.field]: normalizedThinking.value
-        }, profiles[provider]);
+    function populateProviderSelect() {
+        replaceOptions(cfgProvider, getProviderDefinitions().map((provider) => ({
+            value: provider.id,
+            label: provider.settingsLabel
+        })));
+        cfgProvider.value = activeProvider;
+        refreshCustomSelect(cfgProvider);
     }
 
-    function applyProviderProfile(provider, profile) {
+    function renderProviderPresentation(provider) {
+        const placeholders = getProviderPlaceholders(provider);
+        cfgUrl.placeholder = placeholders.apiUrl;
+        cfgKey.placeholder = placeholders.apiKey;
+        cfgBackupKey.placeholder = placeholders.backupApiKey;
+        cfgModel.placeholder = placeholders.model;
+
+        const reasoning = getProviderThinkingConfig(provider);
+        cfgThinkingLabel.textContent = reasoning.label;
+        cfgThinkingNote.textContent = reasoning.note;
+        replaceOptions(cfgThinkingLevel, [
+            { value: '', label: 'Auto' },
+            ...reasoning.options.map((value, index) => ({
+                value,
+                label: index === 0 ? 'Disabled' : value
+            }))
+        ]);
+
+        const search = getProviderSearchConfig(provider);
+        cfgSearchLabel.textContent = search.label;
+        cfgSearchNote.textContent = search.note;
+        cfgSearchEnabled.disabled = false;
+    }
+
+    function readProviderProfile(provider) {
+        const reasoning = getProviderThinkingConfig(provider);
+        return {
+            apiUrl: cfgUrl.value.trim(),
+            apiKey: cfgKey.value.trim(),
+            backupApiKey: cfgBackupKey.value.trim(),
+            model: cfgModel.value.trim(),
+            searchEnabled: cfgSearchEnabled.checked,
+            [reasoning.field]: normalizeReasoningField(provider, cfgThinkingLevel.value)
+        };
+    }
+
+    function applyProviderProfile(provider) {
+        const profile = profiles[provider];
+        const reasoning = getProviderThinkingConfig(provider);
         cfgUrl.value = profile.apiUrl;
         cfgKey.value = profile.apiKey;
         cfgBackupKey.value = profile.backupApiKey;
         cfgModel.value = profile.model;
-        if (cfgThinkingLevel) {
-            const thinkingValue = formatForUi(provider, profile);
-            setPendingThinkingValue(cfgThinkingLevel, thinkingValue);
-            cfgThinkingLevel.value = thinkingValue;
-        }
-        if (cfgSearchEnabled) {
-            cfgSearchEnabled.checked = profile.searchEnabled === true;
-        }
+        cfgThinkingLevel.value = profile[reasoning.field] || '';
+        cfgSearchEnabled.checked = profile.searchEnabled;
+        refreshCustomSelect(cfgThinkingLevel);
     }
 
-    function switchProvider(nextProviderRaw) {
-        const nextProvider = normalizeProvider(nextProviderRaw);
-        if (nextProvider === activeProvider) return;
-        profiles[activeProvider] = readProviderFields(activeProvider);
+    function switchProvider(nextProviderValue) {
+        const nextProvider = resolveProviderId(nextProviderValue, CHAT_DEFAULTS.provider);
+        if (nextProvider === activeProvider) {
+            return;
+        }
+
+        profiles[activeProvider] = readProviderProfile(activeProvider);
         activeProvider = nextProvider;
-        applyProviderProfile(activeProvider, profiles[activeProvider]);
+        renderProviderPresentation(activeProvider);
+        applyProviderProfile(activeProvider);
     }
 
-    function applyConfigToForm(config) {
-        profiles = cloneProfiles(config.profiles);
-        activeProvider = config.provider;
-        if (cfgProvider) cfgProvider.value = config.provider;
-        applyProviderProfile(activeProvider, profiles[activeProvider]);
+    function applyCommonSettings(config) {
         cfgPrompt.value = config.systemPrompt;
-        if (cfgEnablePseudoStream) cfgEnablePseudoStream.checked = config.enablePseudoStream;
-        if (cfgEnableDraftAutosave) cfgEnableDraftAutosave.checked = config.enableDraftAutosave;
-        if (cfgPrefixWithTime) cfgPrefixWithTime.checked = config.prefixWithTime;
-        if (cfgPrefixWithName) cfgPrefixWithName.checked = config.prefixWithName;
-        if (cfgUserName) cfgUserName.value = config.userName;
+        cfgPrefixWithTime.checked = config.prefixWithTime;
+        cfgPrefixWithName.checked = config.prefixWithName;
+        cfgUserName.value = config.userName;
     }
 
-    function readConfigFromForm() {
-        const selectedProvider = cfgProvider ? normalizeProvider(cfgProvider.value) : activeProvider;
-        if (selectedProvider !== activeProvider) switchProvider(selectedProvider);
-        profiles[activeProvider] = readProviderFields(activeProvider);
-        return toRuntimeConfig(activeProvider, cloneProfiles(profiles), {
+    function readCommonSettings() {
+        return {
             systemPrompt: cfgPrompt.value,
-            enablePseudoStream: cfgEnablePseudoStream ? cfgEnablePseudoStream.checked : CHAT_DEFAULTS.enablePseudoStream,
-            enableDraftAutosave: cfgEnableDraftAutosave ? cfgEnableDraftAutosave.checked : CHAT_DEFAULTS.enableDraftAutosave,
-            prefixWithTime: cfgPrefixWithTime ? cfgPrefixWithTime.checked : CHAT_DEFAULTS.prefixWithTime,
-            prefixWithName: cfgPrefixWithName ? cfgPrefixWithName.checked : CHAT_DEFAULTS.prefixWithName,
-            userName: cfgUserName ? cfgUserName.value : CHAT_DEFAULTS.userName
-        });
+            enableMarkerSplit: true,
+            prefixWithTime: cfgPrefixWithTime.checked,
+            prefixWithName: cfgPrefixWithName.checked,
+            userName: cfgUserName.value.trim()
+        };
+    }
+
+    function captureActiveProfile() {
+        profiles[activeProvider] = readProviderProfile(activeProvider);
+        return profiles[activeProvider];
     }
 
     function loadConfig() {
-        const config = normalizeStoredConfig(safeGetJson(storageKey, {}, globalThis.localStorage));
-        applyConfigToForm(config);
+        const config = normalizeStoredConfig(
+            safeGetJson(storageKey, null, globalThis.localStorage)
+        );
+        activeProvider = config.provider;
+        profiles = config.profiles;
+
+        populateProviderSelect();
+        renderProviderPresentation(activeProvider);
+        applyProviderProfile(activeProvider);
+        applyCommonSettings(config);
     }
 
     function saveConfig() {
-        const config = normalizeStoredConfig(readConfigFromForm());
-        safeSetJson(storageKey, toStoredConfig(config), globalThis.localStorage);
+        captureActiveProfile();
+        safeSetJson(storageKey, {
+            provider: activeProvider,
+            profiles,
+            ...readCommonSettings()
+        }, globalThis.localStorage);
     }
 
     function getConfig() {
-        const config = normalizeStoredConfig(readConfigFromForm());
-        return { ...config, systemPrompt: config.systemPrompt || CHAT_DEFAULTS.systemPrompt };
+        const profile = captureActiveProfile();
+        const reasoning = getProviderThinkingConfig(activeProvider);
+        const common = readCommonSettings();
+        const reasoningValue = profile[reasoning.field];
+
+        return {
+            provider: activeProvider,
+            apiUrl: profile.apiUrl,
+            apiKey: profile.apiKey,
+            backupApiKey: profile.backupApiKey,
+            model: profile.model,
+            thinkingBudget: reasoning.field === 'thinkingBudget' ? reasoningValue : null,
+            thinkingLevel: reasoning.field === 'thinkingLevel' ? reasoningValue : null,
+            thinkingEffort: reasoning.field === 'thinkingEffort' ? reasoningValue : null,
+            searchEnabled: profile.searchEnabled,
+            systemPrompt: common.systemPrompt,
+            enableMarkerSplit: common.enableMarkerSplit,
+            prefixWithTime: common.prefixWithTime,
+            prefixWithName: common.prefixWithName,
+            userName: common.userName
+        };
     }
 
-    if (cfgProvider && typeof cfgProvider.addEventListener === 'function') {
-        cfgProvider.addEventListener('change', () => switchProvider(cfgProvider.value));
-    }
+    cfgProvider.addEventListener('change', () => switchProvider(cfgProvider.value));
 
     return { loadConfig, saveConfig, getConfig };
 }

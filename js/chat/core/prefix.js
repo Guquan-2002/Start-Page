@@ -8,7 +8,7 @@
  * - 组合多个前缀标签
  *
  * 依赖：无
- * 被依赖：api-manager
+ * 被依赖：api-manager.js
  */
 
 /**
@@ -81,24 +81,6 @@ export function buildTimestampPrefix(config, timestamp) {
     }
 
     return formatPrefixTimestamp(timestamp);
-}
-
-/**
- * 构建完整的消息前缀
- * @param {Object} config - 配置对象
- * @returns {string} 组合后的前缀（多个标签用换行分隔）
- *
- * 注意：当前实现只包含用户名前缀，时间戳前缀需要单独调用 buildTimestampPrefix
- */
-export function buildMessagePrefix(config) {
-    const tags = [];
-
-    const nameTag = buildNamePrefix(config);
-    if (nameTag) {
-        tags.push(nameTag);
-    }
-
-    return tags.join('\n');
 }
 
 /**

@@ -1,18 +1,15 @@
 ﻿// App-level runtime config for weather/network/search; merged from localStorage and optional global overrides.
 import { safeGetJson, safeSetJson } from './shared/safe-storage.js';
+import { asTrimmedString } from './shared/string-utils.js';
 
 const RUNTIME_CONFIG_STORAGE_KEY = 'startpage_config';
-const WEATHER_SETUP_PROMPT_FLAG_KEY = 'weather_setup_prompted_v1';
+const WEATHER_SETUP_PROMPT_FLAG_KEY = 'weather_setup_prompted';
 
 // localStorage values are base config; window.__STARTPAGE_CONFIG__ can override per deployment.
 function readRuntimeConfig() {
     const globalConfig = globalThis.__STARTPAGE_CONFIG__ || {};
     const localConfig = safeGetJson(RUNTIME_CONFIG_STORAGE_KEY, {}, globalThis.localStorage);
     return { ...localConfig, ...globalConfig };
-}
-
-function asTrimmedString(value) {
-    return typeof value === 'string' ? value.trim() : '';
 }
 
 export function saveRuntimeConfig(partialConfig) {
@@ -144,6 +141,5 @@ export const SEARCH_ENGINES = {
         statusText: '断开'
     }
 };
-
 
 

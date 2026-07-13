@@ -12,12 +12,17 @@ function createAnthropicConfig(overrides = {}) {
         backupApiKey: 'backup-key',
         model: 'claude-sonnet-4-5-20250929',
         systemPrompt: 'You are a helpful assistant.',
-        enablePseudoStream: true,
         ...overrides
     };
 }
 
-const contextMessages = [{ role: 'user', content: 'hello' }];
+const localMessageEnvelope = {
+    systemInstruction: 'You are a helpful assistant.',
+    messages: [{
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }]
+    }]
+};
 
 function toSseEvent(payload, eventName = 'content_block_delta') {
     return `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -69,7 +74,7 @@ test('anthropic provider falls back to backup key when primary key fails', async
 
     const result = await provider.generate({
         config: createAnthropicConfig(),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onFallbackKey: () => {
             fallbackNoticeCount += 1;
@@ -81,7 +86,7 @@ test('anthropic provider falls back to backup key when primary key fails', async
     assert.deepEqual(result.segments, ['anthropic fallback ok']);
 });
 
-test('anthropic provider splits by markers when pseudo stream is enabled', async () => {
+test('anthropic provider splits by markers when streaming is enabled', async () => {
     const responseText = `A${ASSISTANT_SENTENCE_MARKER}B${ASSISTANT_SEGMENT_MARKER}C`;
     const fetchMock = async () => new Response(JSON.stringify({
         content: [{ type: 'text', text: responseText }]
@@ -92,15 +97,15 @@ test('anthropic provider splits by markers when pseudo stream is enabled', async
 
     const provider = createAnthropicProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createAnthropicConfig({ backupApiKey: '', enablePseudoStream: true }),
-        contextMessages,
+        config: createAnthropicConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
     assert.deepEqual(result.segments, ['A', 'B', 'C']);
 });
 
-test('anthropic provider keeps marker text when pseudo stream is disabled', async () => {
+test('anthropic provider splits by markers by default', async () => {
     const responseText = `A${ASSISTANT_SENTENCE_MARKER}B${ASSISTANT_SEGMENT_MARKER}C`;
     const fetchMock = async () => new Response(JSON.stringify({
         content: [{ type: 'text', text: responseText }]
@@ -111,12 +116,12 @@ test('anthropic provider keeps marker text when pseudo stream is disabled', asyn
 
     const provider = createAnthropicProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const result = await provider.generate({
-        config: createAnthropicConfig({ backupApiKey: '', enablePseudoStream: false }),
-        contextMessages,
+        config: createAnthropicConfig(),
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
-    assert.deepEqual(result.segments, [responseText]);
+    assert.deepEqual(result.segments, ['A', 'B', 'C']);
 });
 
 test('anthropic provider stream yields text deltas from SSE', async () => {
@@ -141,7 +146,7 @@ test('anthropic provider stream yields text deltas from SSE', async () => {
     const provider = createAnthropicProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectDeltas(provider.generateStream({
         config: createAnthropicConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -173,7 +178,7 @@ test('anthropic provider stream emits reasoning signal for thinking delta', asyn
     const provider = createAnthropicProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const events = await collectEvents(provider.generateStream({
         config: createAnthropicConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -204,7 +209,7 @@ test('anthropic provider stream throws on SSE error event', async () => {
     await assert.rejects(
         collectDeltas(provider.generateStream({
             config: createAnthropicConfig({ backupApiKey: '' }),
-            contextMessages,
+            localMessageEnvelope,
             signal: new AbortController().signal
         })),
         /stream failed/
@@ -230,7 +235,7 @@ test('anthropic provider maps thinking effort and web search format', async () =
             thinkingEffort: 'medium',
             searchEnabled: true
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -272,7 +277,7 @@ test('anthropic provider omits web search tools when search is disabled', async 
             backupApiKey: '',
             searchEnabled: false
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -297,7 +302,7 @@ test('anthropic provider omits thinking when effort is none', async () => {
             backupApiKey: '',
             thinkingEffort: 'none'
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -321,10 +326,9 @@ test('anthropic provider keeps non-stream request for adaptive thinking', async 
     const result = await provider.generate({
         config: createAnthropicConfig({
             backupApiKey: '',
-            thinkingEffort: 'high',
-            maxTokens: 50000
+            thinkingEffort: 'high'
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -364,7 +368,7 @@ test('anthropic provider stream does not switch to backup key after first delta'
     await assert.rejects(
         collectDeltas(provider.generateStream({
             config: createAnthropicConfig(),
-            contextMessages,
+            localMessageEnvelope,
             signal: new AbortController().signal
         })),
         /stream broken/
@@ -372,4 +376,3 @@ test('anthropic provider stream does not switch to backup key after first delta'
 
     assert.deepEqual(apiKeys, ['primary-key']);
 });
-

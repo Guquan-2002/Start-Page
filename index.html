@@ -53,27 +53,12 @@
         <div id="chat-header">
             <div id="chat-title-group">
                 <span id="chat-title">AI Chat</span>
-                <a id="chat-page-link" href="pages/chat.html" target="_blank" rel="noopener noreferrer" aria-label="Open standalone chat page in a new tab" title="Open standalone chat page">
-                    <i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i>
-                </a>
             </div>
             <div id="chat-header-actions">
-                <button id="chat-history-btn" title="Chat history"><i class="fas fa-history"></i></button>
                 <button id="chat-settings-btn" title="Settings"><i class="fas fa-cog"></i></button>
                 <button id="chat-clear-btn" title="Start new chat"><i class="fas fa-trash-alt"></i></button>
                 <button id="chat-close-btn" title="Close"><i class="fas fa-times"></i></button>
             </div>
-        </div>
-
-        <div id="chat-history" class="chat-history-hidden">
-            <div id="chat-history-header">
-                <span>Chat History</span>
-                <div id="chat-history-actions">
-                    <button id="chat-new-session-btn" title="New chat"><i class="fas fa-plus"></i></button>
-                    <button id="chat-clear-all-btn" title="Delete all chats"><i class="fas fa-trash-alt"></i></button>
-                </div>
-            </div>
-            <div id="chat-history-list"></div>
         </div>
 
         <div id="chat-settings" class="chat-settings-hidden">
@@ -135,19 +120,6 @@
                     </div>
 
                     <div class="chat-settings-section">
-                        <span class="chat-settings-section-title">Experience</span>
-                        <label class="chat-settings-toggle" for="cfg-enable-pseudo-stream">
-                            <input type="checkbox" id="cfg-enable-pseudo-stream">
-                            <span>Enable pseudo streaming</span>
-                        </label>
-                        <label class="chat-settings-toggle" for="cfg-enable-draft-autosave">
-                            <input type="checkbox" id="cfg-enable-draft-autosave">
-                            <span>Enable draft autosave</span>
-                        </label>
-                        <small class="chat-settings-note">Pseudo streaming renders assistant output progressively after the full response arrives.</small>
-                    </div>
-
-                    <div class="chat-settings-section">
                         <span class="chat-settings-section-title">Message Prefix</span>
                         <label class="chat-settings-toggle" for="cfg-prefix-with-time">
                             <input type="checkbox" id="cfg-prefix-with-time">
@@ -191,6 +163,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.3/purify.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
     <script type="module" src="js/main.js"></script>
 </body>

@@ -11,12 +11,17 @@ function createArkConfig(overrides = {}) {
         backupApiKey: 'backup-key',
         model: 'doubao-seed-2-0-pro-260215',
         systemPrompt: 'You are a helpful assistant.',
-        enablePseudoStream: true,
         ...overrides
     };
 }
 
-const contextMessages = [{ role: 'user', content: 'hello' }];
+const localMessageEnvelope = {
+    systemInstruction: 'You are a helpful assistant.',
+    messages: [{
+        role: 'user',
+        parts: [{ type: 'text', text: 'hello' }]
+    }]
+};
 
 function toSseEvent(payload) {
     return `data: ${JSON.stringify(payload)}\n\n`;
@@ -70,7 +75,7 @@ test('ark provider parses non-stream response and maps thinking/web search', asy
             thinkingBudget: 'high',
             searchEnabled: true
         }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     });
 
@@ -107,7 +112,7 @@ test('ark provider stream yields text deltas from SSE', async () => {
     const provider = createArkProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const deltas = await collectDeltas(provider.generateStream({
         config: createArkConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -135,7 +140,7 @@ test('ark provider stream emits reasoning signal for reasoning SSE events', asyn
     const provider = createArkProvider({ fetchImpl: fetchMock, maxRetries: 0 });
     const events = await collectEvents(provider.generateStream({
         config: createArkConfig({ backupApiKey: '' }),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal
     }));
 
@@ -158,7 +163,9 @@ test('ark provider falls back to backup key when primary key fails', async () =>
         }
 
         return new Response(JSON.stringify({
-            output_text: 'ark fallback ok'
+            output: [{
+                content: [{ type: 'output_text', text: 'ark fallback ok' }]
+            }]
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' }
@@ -170,7 +177,7 @@ test('ark provider falls back to backup key when primary key fails', async () =>
 
     const result = await provider.generate({
         config: createArkConfig(),
-        contextMessages,
+        localMessageEnvelope,
         signal: new AbortController().signal,
         onFallbackKey: () => {
             fallbackNoticeCount += 1;
@@ -214,7 +221,7 @@ test('ark provider stream does not switch to backup key after first delta', asyn
     await assert.rejects(
         collectDeltas(provider.generateStream({
             config: createArkConfig(),
-            contextMessages,
+            localMessageEnvelope,
             signal: new AbortController().signal
         })),
         /stream broken/

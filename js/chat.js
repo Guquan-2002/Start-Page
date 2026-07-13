@@ -1,203 +1,59 @@
 // Chat bootstrap: wires chat UI, state, providers, config, and event handlers.
 import { $ } from './utils.js';
-import {
-    CHAT_DRAFTS_KEY,
-    CHAT_HISTORY_KEY,
-    CHAT_LIMITS,
-    CHAT_STORAGE_KEY
-} from './chat/constants.js';
+import { CHAT_LIMITS, CHAT_STORAGE_KEY } from './chat/constants.js';
 import { createConfigManager } from './chat/app/config-manager.js';
+import { createApiManager } from './chat/app/api-manager.js';
 import { setupMarked, renderMarkdown } from './chat/ui/markdown.js';
 import { createUiManager } from './chat/ui/ui-manager.js';
-import { createHistoryManager } from './chat/session/history-manager.js';
-import { createApiManager } from './chat/app/api-manager.js';
+import { createConversationStore } from './chat/session/conversation-store.js';
+import { createProviderRouter, createRegisteredProviderClients } from './chat/providers/provider-clients.js';
 
-import { createSessionStore } from './chat/session/session-store.js';
-import { getMessageDisplayContent } from './chat/core/message-model.js';
-import {
-    getDefaultProviderId,
-    getProviderDefinitions,
-    getProviderPlaceholders,
-    getProviderSearchConfig,
-    isSupportedProviderId
-} from './chat/providers/provider-registry.js';
-import { createRegisteredProviderClients } from './chat/providers/provider-clients.js';
-import { createProviderRouter } from './chat/providers/provider-router.js';
-import { createDraftManager } from './chat/storage/draft-storage.js';
-import { getThinkingOptions, getUiMeta } from './chat/app/thinking-config.js';
-import { refreshCustomSelect } from './chat/ui/custom-select.js';
+function requiredElement(selector) {
+    const element = $(selector);
+    if (!element) {
+        throw new Error(`Missing required chat element: ${selector}`);
+    }
+    return element;
+}
 
-const PENDING_THINKING_VALUE_ATTR = 'data-pending-thinking-value';
 function getChatElements() {
     return {
-        panel: $('#chat-panel'),
-        toggleBtn: $('#chat-toggle'),
-        closeBtn: $('#chat-close-btn'),
-        clearBtn: $('#chat-clear-btn'),
-        settingsBtn: $('#chat-settings-btn'),
-        settingsDiv: $('#chat-settings'),
-        settingsCloseBtn: $('#cfg-close-btn'),
-        saveBtn: $('#cfg-save-btn'),
-        historyBtn: $('#chat-history-btn'),
-        historyDiv: $('#chat-history'),
-        historyList: $('#chat-history-list'),
-        newSessionBtn: $('#chat-new-session-btn'),
-        clearAllBtn: $('#chat-clear-all-btn'),
-        messagesEl: $('#chat-messages'),
-        chatInput: $('#chat-input'),
-        attachBtn: $('#chat-attach-btn'),
-        imageInput: $('#chat-image-input'),
-        attachmentsEl: $('#chat-attachments'),
-        sendBtn: $('#chat-send-btn'),
-        stopBtn: $('#chat-stop-btn'),
-        cfgProvider: $('#cfg-provider'),
-        cfgUrl: $('#cfg-api-url'),
-        cfgKey: $('#cfg-api-key'),
-        cfgBackupKey: $('#cfg-api-key-backup'),
-        cfgModel: $('#cfg-model'),
-        cfgPrompt: $('#cfg-system-prompt'),
-        cfgThinkingLevel: $('#cfg-thinking-level'),
-        cfgThinkingLabel: $('#cfg-thinking-label'),
-        cfgThinkingNote: $('#cfg-thinking-note'),
-        cfgSearchEnabled: $('#cfg-search-enabled'),
-        cfgSearchLabel: $('#cfg-search-label'),
-        cfgSearchNote: $('#cfg-search-note'),
-        cfgEnablePseudoStream: $('#cfg-enable-pseudo-stream'),
-        cfgEnableDraftAutosave: $('#cfg-enable-draft-autosave'),
-        cfgPrefixWithTime: $('#cfg-prefix-with-time'),
-        cfgPrefixWithName: $('#cfg-prefix-with-name'),
-        cfgUserName: $('#cfg-user-name')
+        panel: requiredElement('#chat-panel'),
+        toggleBtn: requiredElement('#chat-toggle'),
+        closeBtn: requiredElement('#chat-close-btn'),
+        clearBtn: requiredElement('#chat-clear-btn'),
+        settingsBtn: requiredElement('#chat-settings-btn'),
+        settingsDiv: requiredElement('#chat-settings'),
+        settingsCloseBtn: requiredElement('#cfg-close-btn'),
+        saveBtn: requiredElement('#cfg-save-btn'),
+        messagesEl: requiredElement('#chat-messages'),
+        chatInput: requiredElement('#chat-input'),
+        attachBtn: requiredElement('#chat-attach-btn'),
+        imageInput: requiredElement('#chat-image-input'),
+        attachmentsEl: requiredElement('#chat-attachments'),
+        sendBtn: requiredElement('#chat-send-btn'),
+        stopBtn: requiredElement('#chat-stop-btn'),
+        cfgProvider: requiredElement('#cfg-provider'),
+        cfgUrl: requiredElement('#cfg-api-url'),
+        cfgKey: requiredElement('#cfg-api-key'),
+        cfgBackupKey: requiredElement('#cfg-api-key-backup'),
+        cfgModel: requiredElement('#cfg-model'),
+        cfgPrompt: requiredElement('#cfg-system-prompt'),
+        cfgThinkingLevel: requiredElement('#cfg-thinking-level'),
+        cfgThinkingLabel: requiredElement('#cfg-thinking-label'),
+        cfgThinkingNote: requiredElement('#cfg-thinking-note'),
+        cfgSearchEnabled: requiredElement('#cfg-search-enabled'),
+        cfgSearchLabel: requiredElement('#cfg-search-label'),
+        cfgSearchNote: requiredElement('#cfg-search-note'),
+        cfgPrefixWithTime: requiredElement('#cfg-prefix-with-time'),
+        cfgPrefixWithName: requiredElement('#cfg-prefix-with-name'),
+        cfgUserName: requiredElement('#cfg-user-name')
     };
-}
-
-function resizeChatInput(chatInput) {
-    chatInput.style.height = 'auto';
-    chatInput.style.height = `${Math.min(chatInput.scrollHeight, 120)}px`;
-}
-
-function setupInputAutosize(chatInput) {
-    chatInput.addEventListener('input', () => {
-        resizeChatInput(chatInput);
-    });
-}
-
-function readPendingThinkingValue(field) {
-    if (!field) return '';
-    if (typeof field.getAttribute === 'function') {
-        return field.getAttribute(PENDING_THINKING_VALUE_ATTR) || '';
-    }
-    return typeof field.dataset?.pendingThinkingValue === 'string'
-        ? field.dataset.pendingThinkingValue
-        : '';
-}
-
-function clearPendingThinkingValue(field) {
-    if (!field) return;
-    if (typeof field.removeAttribute === 'function') {
-        field.removeAttribute(PENDING_THINKING_VALUE_ATTR);
-        return;
-    }
-    if (field.dataset && typeof field.dataset === 'object') {
-        delete field.dataset.pendingThinkingValue;
-    }
-}
-
-function populateProviderSelect(select) {
-    if (!select) return;
-
-    const previousValue = isSupportedProviderId(select.value)
-        ? select.value
-        : getDefaultProviderId();
-    while (select.firstChild) select.removeChild(select.firstChild);
-
-    getProviderDefinitions().forEach((provider) => {
-        const option = document.createElement('option');
-        option.value = provider.id;
-        option.textContent = provider.settingsLabel;
-        select.appendChild(option);
-    });
-
-    select.value = previousValue;
-    refreshCustomSelect(select);
-}
-
-function syncProviderPresentation(elements, providerId) {
-    const placeholders = getProviderPlaceholders(providerId);
-    if (elements.cfgUrl) {
-        elements.cfgUrl.placeholder = placeholders.apiUrl || '';
-    }
-
-    if (elements.cfgKey) {
-        elements.cfgKey.placeholder = placeholders.apiKey || '';
-    }
-
-    if (elements.cfgBackupKey) {
-        elements.cfgBackupKey.placeholder = placeholders.backupApiKey || placeholders.apiKey || '';
-    }
-
-    if (elements.cfgModel) {
-        elements.cfgModel.placeholder = placeholders.model || '';
-    }
-
-    if (elements.cfgThinkingLabel || elements.cfgThinkingNote) {
-        const meta = getUiMeta(providerId);
-        if (elements.cfgThinkingLabel) elements.cfgThinkingLabel.textContent = meta.label;
-        if (elements.cfgThinkingNote) elements.cfgThinkingNote.textContent = meta.note;
-    }
-
-    if (elements.cfgThinkingLevel) {
-        const select = elements.cfgThinkingLevel;
-        const pending = readPendingThinkingValue(select);
-        const prev = typeof select.value === 'string' && select.value ? select.value : pending;
-        while (select.firstChild) select.removeChild(select.firstChild);
-        const optAuto = document.createElement('option');
-        optAuto.value = '';
-        optAuto.textContent = 'Auto';
-        select.appendChild(optAuto);
-        const options = getThinkingOptions(providerId);
-        options.forEach((o) => {
-            const opt = document.createElement('option');
-            opt.value = o.value;
-            opt.textContent = o.label;
-            select.appendChild(opt);
-        });
-        const values = new Set(options.map((o) => o.value));
-        select.value = prev && values.has(prev) ? prev : '';
-        clearPendingThinkingValue(select);
-        refreshCustomSelect(select);
-        if (elements.cfgProvider) refreshCustomSelect(elements.cfgProvider);
-    }
-
-    const searchConfig = getProviderSearchConfig(providerId);
-    if (elements.cfgSearchLabel) {
-        elements.cfgSearchLabel.textContent = searchConfig?.label || 'Web Search';
-    }
-
-    if (elements.cfgSearchNote) {
-        elements.cfgSearchNote.textContent = searchConfig?.note || '';
-    }
-
-    if (elements.cfgSearchEnabled) {
-        const isSearchSupported = searchConfig?.supported !== false
-            && typeof searchConfig?.apply === 'function';
-        elements.cfgSearchEnabled.disabled = !isSearchSupported;
-        if (!isSearchSupported) {
-            elements.cfgSearchEnabled.checked = false;
-        }
-    }
 }
 
 export function initChat() {
     const elements = getChatElements();
-    const store = createSessionStore({
-        storage: globalThis.localStorage,
-        historyKey: CHAT_HISTORY_KEY
-    });
-    const draftManager = createDraftManager({
-        storage: globalThis.localStorage,
-        storageKey: CHAT_DRAFTS_KEY
-    });
-
+    const store = createConversationStore();
     const configManager = createConfigManager({
         cfgProvider: elements.cfgProvider,
         cfgUrl: elements.cfgUrl,
@@ -206,62 +62,25 @@ export function initChat() {
         cfgModel: elements.cfgModel,
         cfgPrompt: elements.cfgPrompt,
         cfgThinkingLevel: elements.cfgThinkingLevel,
+        cfgThinkingLabel: elements.cfgThinkingLabel,
+        cfgThinkingNote: elements.cfgThinkingNote,
         cfgSearchEnabled: elements.cfgSearchEnabled,
-        cfgEnablePseudoStream: elements.cfgEnablePseudoStream,
-        cfgEnableDraftAutosave: elements.cfgEnableDraftAutosave,
+        cfgSearchLabel: elements.cfgSearchLabel,
+        cfgSearchNote: elements.cfgSearchNote,
         cfgPrefixWithTime: elements.cfgPrefixWithTime,
         cfgPrefixWithName: elements.cfgPrefixWithName,
         cfgUserName: elements.cfgUserName
     }, CHAT_STORAGE_KEY);
 
-    let historyManager = null;
-    let draftSaveTimerId = null;
-
-    const getRuntimeConfig = () => configManager.getConfig();
-
     const renderActiveConversation = () => {
-        ui.renderConversation(store.getActiveMessages(), getMessageDisplayContent);
+        ui.renderConversation(store.getActiveMessages());
     };
-
-    const restoreDraftForActiveSession = () => {
-        const config = getRuntimeConfig();
-        if (!config.enableDraftAutosave) {
-            elements.chatInput.value = '';
-            resizeChatInput(elements.chatInput);
-            return;
-        }
-
-        const activeSessionId = store.getActiveSessionId();
-        const draftText = draftManager.getDraft(activeSessionId);
-        elements.chatInput.value = draftText;
-        resizeChatInput(elements.chatInput);
+    const openSettings = () => {
+        elements.settingsDiv.classList.remove('chat-settings-hidden');
+        elements.cfgProvider.focus();
     };
-
-    const scheduleDraftSave = () => {
-        clearTimeout(draftSaveTimerId);
-
-        const config = getRuntimeConfig();
-        if (!config.enableDraftAutosave) {
-            return;
-        }
-
-        const sessionId = store.getActiveSessionId();
-        const draftText = elements.chatInput.value;
-
-        draftSaveTimerId = setTimeout(() => {
-            draftManager.setDraft(sessionId, draftText);
-        }, 250);
-    };
-
-    const saveDraftImmediately = () => {
-        clearTimeout(draftSaveTimerId);
-
-        const config = getRuntimeConfig();
-        if (!config.enableDraftAutosave) {
-            return;
-        }
-
-        draftManager.setDraft(store.getActiveSessionId(), elements.chatInput.value);
+    const closeSettings = () => {
+        elements.settingsDiv.classList.add('chat-settings-hidden');
     };
 
     const ui = createUiManager({
@@ -271,21 +90,12 @@ export function initChat() {
             attachBtn: elements.attachBtn,
             sendBtn: elements.sendBtn,
             stopBtn: elements.stopBtn,
-            sessionActionButtons: [
-                elements.historyBtn,
-                elements.clearBtn,
-                elements.newSessionBtn,
-                elements.clearAllBtn
-            ]
+            sessionActionButtons: [elements.clearBtn]
         },
         renderMarkdown,
         maxRenderedMessages: CHAT_LIMITS.maxRenderedMessages,
         isRetryBlocked: () => store.isStreaming(),
         onRetryRequested: ({ turnId, content }) => {
-            if (store.isStreaming()) {
-                return;
-            }
-
             const rollbackResult = store.rollbackToTurn(turnId);
             if (!rollbackResult) {
                 return;
@@ -293,94 +103,42 @@ export function initChat() {
 
             renderActiveConversation();
             elements.chatInput.value = rollbackResult.retryContent || content;
-            resizeChatInput(elements.chatInput);
+            ui.resizeInput();
             elements.chatInput.focus();
-            saveDraftImmediately();
-
-            historyManager?.renderHistoryList();
         }
-    });
-
-    const notifySessionBusy = () => {
-        ui.addSystemNotice('Please stop generation before switching or editing chat sessions.', 3000);
-    };
-
-    historyManager = createHistoryManager({
-        store,
-        elements: {
-            historyDiv: elements.historyDiv,
-            historyList: elements.historyList
-        },
-        onSessionActivated: () => {
-            renderActiveConversation();
-            restoreDraftForActiveSession();
-            historyManager.renderHistoryList();
-        },
-        onSessionDeleted: (sessionId) => {
-            draftManager.removeDraft(sessionId);
-        },
-        onSessionsCleared: () => {
-            draftManager.clearAllDrafts();
-        },
-        isSessionOperationBlocked: () => store.isStreaming(),
-        onBlockedSessionOperation: notifySessionBusy
     });
 
     const provider = createProviderRouter(createRegisteredProviderClients({
         maxRetries: CHAT_LIMITS.maxRetries
     }));
-
     const apiManager = createApiManager({
         store,
         elements: {
             chatInput: elements.chatInput,
             attachBtn: elements.attachBtn,
             imageInput: elements.imageInput,
-            attachmentsEl: elements.attachmentsEl,
-            settingsDiv: elements.settingsDiv
+            attachmentsEl: elements.attachmentsEl
         },
         ui,
         configManager,
         provider,
+        openSettings,
         constants: {
             connectTimeoutMs: CHAT_LIMITS.connectTimeoutMs,
             maxContextTokens: CHAT_LIMITS.maxContextTokens,
-            maxContextMessages: CHAT_LIMITS.maxContextMessages
+            maxContextMessages: CHAT_LIMITS.maxContextMessages,
+            tokenPerImage: CHAT_LIMITS.tokenPerImage
         },
-        onConversationUpdated: () => {
-            historyManager.renderHistoryList();
-        },
-        onUserMessageAccepted: ({ sessionId }) => {
-            clearTimeout(draftSaveTimerId);
-            draftManager.removeDraft(sessionId);
+        onUserMessageAccepted: () => {
             elements.sendBtn.classList.remove('has-text');
         }
     });
 
-    const openSettings = () => {
-        elements.settingsDiv.classList.remove('chat-settings-hidden');
-        elements.historyDiv.classList.add('chat-history-hidden');
-        if (elements.cfgProvider) {
-            elements.cfgProvider.focus();
-            return;
-        }
-
-        elements.cfgUrl.focus();
-    };
-
-    const closeSettings = () => {
-        elements.settingsDiv.classList.add('chat-settings-hidden');
-    };
-
     setupMarked();
-    setupInputAutosize(elements.chatInput);
-
-    elements.chatInput.addEventListener('input', scheduleDraftSave);
     elements.chatInput.addEventListener('input', () => {
+        ui.resizeInput();
         elements.sendBtn.classList.toggle('has-text', elements.chatInput.value.trim().length > 0);
     });
-    elements.chatInput.addEventListener('blur', saveDraftImmediately);
-    globalThis.addEventListener('beforeunload', saveDraftImmediately);
 
     elements.toggleBtn.addEventListener('click', () => {
         elements.panel.classList.remove('chat-hidden');
@@ -392,139 +150,52 @@ export function initChat() {
             }
         });
     });
-
     elements.closeBtn.addEventListener('click', () => {
         elements.panel.classList.add('chat-hidden');
         closeSettings();
     });
-
     elements.settingsBtn.addEventListener('click', () => {
         if (elements.settingsDiv.classList.contains('chat-settings-hidden')) {
             openSettings();
-            return;
+        } else {
+            closeSettings();
         }
-
-        closeSettings();
     });
-
     elements.saveBtn.addEventListener('click', () => {
         configManager.saveConfig();
-
-        const latestConfig = getRuntimeConfig();
-        if (!latestConfig.enableDraftAutosave) {
-            clearTimeout(draftSaveTimerId);
-        }
-
-        if (latestConfig.enableDraftAutosave && !elements.chatInput.value.trim()) {
-            restoreDraftForActiveSession();
-        }
-
         closeSettings();
     });
-
     elements.settingsCloseBtn.addEventListener('click', closeSettings);
-
-    elements.historyBtn.addEventListener('click', () => {
-        if (store.isStreaming()) {
-            notifySessionBusy();
-            return;
-        }
-
-        elements.historyDiv.classList.toggle('chat-history-hidden');
-        closeSettings();
-
-        if (!elements.historyDiv.classList.contains('chat-history-hidden')) {
-            historyManager.renderHistoryList();
-        }
-    });
-
-    elements.newSessionBtn.addEventListener('click', () => {
-        if (store.isStreaming()) {
-            notifySessionBusy();
-            return;
-        }
-
-        historyManager.createNewSession();
-        elements.historyDiv.classList.add('chat-history-hidden');
-        historyManager.renderHistoryList();
-    });
-
-    elements.clearAllBtn.addEventListener('click', () => {
-        if (store.isStreaming()) {
-            notifySessionBusy();
-            return;
-        }
-
-        historyManager.clearAllSessions();
-    });
 
     elements.clearBtn.addEventListener('click', () => {
         if (store.isStreaming()) {
-            notifySessionBusy();
+            ui.addSystemNotice('Please stop generation before starting a new chat.', 3000);
             return;
         }
-
-        historyManager.createNewSession();
-        ui.setStreamingUI(false);
+        store.clearConversation();
+        renderActiveConversation();
+        elements.chatInput.value = '';
+        ui.resizeInput();
         closeSettings();
+        elements.chatInput.focus();
     });
-
     elements.stopBtn.addEventListener('click', () => {
         apiManager.stopGeneration();
     });
-
     elements.sendBtn.addEventListener('click', apiManager.sendMessage);
-
     elements.chatInput.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' || event.shiftKey) return;
+        if (event.key !== 'Enter' || event.shiftKey) {
+            return;
+        }
         event.preventDefault();
         apiManager.sendMessage();
     });
-
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && !elements.settingsDiv.classList.contains('chat-settings-hidden')) {
             closeSettings();
         }
     });
 
-    populateProviderSelect(elements.cfgProvider);
     configManager.loadConfig();
-    if (elements.cfgProvider) {
-        syncProviderPresentation(elements, elements.cfgProvider.value || getDefaultProviderId());
-
-        elements.cfgProvider.addEventListener('change', () => {
-            const providerId = elements.cfgProvider.value || getDefaultProviderId();
-            // Defer to run after config-manager's switchProvider handler,
-            // so we can repopulate options and preserve the provider-specific value.
-            setTimeout(() => syncProviderPresentation(elements, providerId), 0);
-        });
-    }
-    store.initialize();
     renderActiveConversation();
-    restoreDraftForActiveSession();
-    historyManager.renderHistoryList();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

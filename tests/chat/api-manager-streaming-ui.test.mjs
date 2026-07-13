@@ -37,8 +37,8 @@ function createStore() {
         getActiveMessages() {
             return [...messages];
         },
-        getActiveSessionId() {
-            return 'session_1';
+        getConversationId() {
+            return 'conv_1';
         },
         isStreaming() {
             return streaming;
@@ -62,9 +62,6 @@ function createStore() {
             abortController.abort();
             return true;
         },
-        setAbortReason(reason) {
-            abortReason = reason;
-        },
         getAbortReason() {
             return abortReason;
         }
@@ -74,14 +71,14 @@ function createStore() {
 function createUiSpy() {
     let nextStreamElementId = 1;
     const state = {
-        loadingCalls: 0,
-        loadingRemoved: 0,
         streamingCreates: [],
         streamingUpdates: [],
         streamingFinalizations: [],
         removedStreamElements: [],
         notices: [],
         errors: [],
+        appendedMessages: [],
+        streamingUiStates: [],
         trace: []
     };
 
@@ -103,27 +100,21 @@ function createUiSpy() {
     return {
         state,
         ui: {
-            addMessage() {},
+            appendChatMessages(messages) {
+                state.appendedMessages.push(...messages);
+            },
+            resizeInput() {},
             addSystemNotice(text) {
                 state.notices.push(text);
             },
             addErrorMessage(payload) {
                 state.errors.push(payload);
             },
-            setStreamingUI() {},
+            setStreamingUI(streaming) {
+                state.streamingUiStates.push(streaming);
+            },
             showRetryNotice() {},
             showBackupKeyNotice() {},
-            addLoadingMessage() {
-                state.loadingCalls += 1;
-                return {
-                    remove() {
-                        state.loadingRemoved += 1;
-                    },
-                    classList: {
-                        remove() {}
-                    }
-                };
-            },
             createAssistantStreamingMessage(_identifiers = {}, options = {}) {
                 const id = nextStreamElementId;
                 nextStreamElementId += 1;
@@ -162,13 +153,15 @@ function createUiSpy() {
 }
 
 function createElements(chatInput) {
+    const classList = {
+        toggle() {},
+        remove() {}
+    };
     return {
         chatInput,
-        settingsDiv: {
-            classList: {
-                remove() {}
-            }
-        }
+        attachBtn: { addEventListener() {}, classList, title: '' },
+        imageInput: { addEventListener() {}, click() {}, files: [], value: '' },
+        attachmentsEl: { innerHTML: '', appendChild() {} }
     };
 }
 
@@ -179,7 +172,6 @@ function createConfig(overrides = {}) {
         backupApiKey: '',
         apiUrl: 'https://api.openai.com/v1',
         model: 'gpt-5',
-        enablePseudoStream: true,
         prefixWithTime: false,
         prefixWithName: false,
         userName: 'User',
@@ -205,7 +197,10 @@ function createManager({
             }
         },
         provider,
-        constants: { connectTimeoutMs: 500, maxContextTokens: 200000, maxContextMessages: 120 }
+        constants: { connectTimeoutMs: 500, maxContextTokens: 200000, maxContextMessages: 120 },
+        openSettings() {},
+        onConversationUpdated() {},
+        onUserMessageAccepted() {}
     });
 
     return {
@@ -238,7 +233,7 @@ async function waitFor(predicate, timeoutMs = 500) {
     }
 }
 
-test('pseudo stream mode does not create dot-loading bubble', async () => {
+test('streaming mode does not create dot-loading bubble', async () => {
     const provider = {
         id: 'mock-provider',
         async generate() {
@@ -246,7 +241,6 @@ test('pseudo stream mode does not create dot-loading bubble', async () => {
         },
         async *generateStream() {
             yield { type: 'ping' };
-            yield { type: 'done' };
         }
     };
 
@@ -254,7 +248,6 @@ test('pseudo stream mode does not create dot-loading bubble', async () => {
     chatInput.value = 'hello';
     await manager.sendMessage();
 
-    assert.equal(uiState.loadingCalls, 0);
     assert.equal(uiState.errors.length, 0);
 });
 
@@ -270,8 +263,6 @@ test('streaming placeholder is created only after first text-delta', async () =>
             yield { type: 'ping' };
             sharedTrace.push('emit:text');
             yield { type: 'text-delta', text: 'hello' };
-            sharedTrace.push('emit:done');
-            yield { type: 'done' };
         }
     };
 
@@ -299,8 +290,6 @@ test('reasoning event can trigger placeholder before first text-delta', async ()
             yield { type: 'reasoning' };
             sharedTrace.push('emit:text');
             yield { type: 'text-delta', text: 'hello' };
-            sharedTrace.push('emit:done');
-            yield { type: 'done' };
         }
     };
 
@@ -324,7 +313,6 @@ test('marker split finalizes current placeholder and persists completed segment'
         },
         async *generateStream() {
             yield { type: 'text-delta', text: `Hello${ASSISTANT_SENTENCE_MARKER}` };
-            yield { type: 'done' };
         }
     };
 
@@ -351,7 +339,6 @@ test('multiple markers create multiple finalized assistant bubbles in order', as
                 type: 'text-delta',
                 text: `A${ASSISTANT_SENTENCE_MARKER}B${ASSISTANT_SEGMENT_MARKER}C`
             };
-            yield { type: 'done' };
         }
     };
 
@@ -364,7 +351,6 @@ test('multiple markers create multiple finalized assistant bubbles in order', as
         uiState.streamingFinalizations.map((item) => item.text),
         ['A', 'B', 'C']
     );
-    assert.equal(uiState.loadingCalls, 0);
 });
 
 test('user abort discards unmarked partial content and removes placeholder', async () => {
@@ -398,7 +384,7 @@ test('user abort discards unmarked partial content and removes placeholder', asy
     );
 });
 
-test('stream failure before first delta falls back silently to non-streaming response', async () => {
+test('stream failure is reported without sending a second non-streaming request', async () => {
     let sharedTrace = null;
     let streamAttempts = 0;
     let nonStreamAttempts = 0;
@@ -407,7 +393,7 @@ test('stream failure before first delta falls back silently to non-streaming res
         async generate() {
             nonStreamAttempts += 1;
             sharedTrace.push('provider:generate');
-            return { segments: ['fallback-answer'] };
+            return { segments: ['unexpected-answer'] };
         },
         async *generateStream() {
             streamAttempts += 1;
@@ -422,12 +408,9 @@ test('stream failure before first delta falls back silently to non-streaming res
     await manager.sendMessage();
 
     assert.equal(streamAttempts, 1);
-    assert.equal(nonStreamAttempts, 1);
-    assert.equal(uiState.loadingCalls, 0);
+    assert.equal(nonStreamAttempts, 0);
     assert.equal(uiState.streamingCreates.some((item) => item.options.placeholder), false);
-    assert.deepEqual(getAssistantContents(store.getActiveMessages()), ['fallback-answer']);
-    assert.equal(
-        uiState.trace.indexOf('provider:generate') < uiState.trace.findIndex((entry) => entry.startsWith('ui:create:')),
-        true
-    );
+    assert.deepEqual(getAssistantContents(store.getActiveMessages()), []);
+    assert.equal(uiState.errors.length, 1);
+    assert.deepEqual(uiState.streamingUiStates, [true, false]);
 });
