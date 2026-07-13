@@ -4,13 +4,21 @@ import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { handleChatApi } from './src/server/chat-api.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;
 const HOST = process.env.HOST || DEFAULT_HOST;
-const ROOT_DIR = __dirname;
+const ROOT_DIR = path.join(__dirname, 'dist');
+const ENTRY_FILE = path.join(ROOT_DIR, 'index.html');
+
+if (!existsSync(ENTRY_FILE)) {
+  console.error('Production build not found. Run "npm run build" before "npm start".');
+  process.exit(1);
+}
 
 function resolvePort(rawPort) {
   if (!rawPort) {
@@ -37,6 +45,7 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.map': 'application/json; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
@@ -77,6 +86,10 @@ function resolvePath(urlPath) {
 }
 
 const server = createServer(async (request, response) => {
+  if (await handleChatApi(request, response)) {
+    return;
+  }
+
   const requestPath = request.url === '/' ? '/index.html' : request.url || '/index.html';
   const resolved = resolvePath(requestPath);
 
@@ -101,6 +114,7 @@ const server = createServer(async (request, response) => {
 server.listen(PORT, HOST, () => {
   console.log(`Start Page listening on http://${HOST}:${PORT}`);
   console.log(`Local access: http://localhost:${PORT}`);
+  console.log(`Serving production build from ${ROOT_DIR}`);
 });
 
 server.on('error', (error) => {

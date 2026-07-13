@@ -16,38 +16,6 @@
     select {
         font-size: 16px !important;
     }
-
-    /* 移动端消息溢出保护 */
-    .chat-msg {
-        max-width: 95%;
-        word-break: break-word;
-        overflow-wrap: anywhere;
-    }
-
-    .chat-msg.assistant {
-        overflow-wrap: anywhere;
-    }
-
-    /* 确保长URL和代码不会溢出 */
-    .chat-msg.assistant a,
-    .chat-msg.assistant code:not(pre code) {
-        word-break: break-all;
-        overflow-wrap: anywhere;
-    }
-
-    /* 代码块在移动端的优化 */
-    .chat-msg.assistant pre {
-        max-width: calc(100vw - 60px);
-        overflow-x: auto;
-    }
-
-    /* 表格在移动端的优化 */
-    .chat-msg.assistant table {
-        font-size: 0.75em;
-        display: block;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
 }
 
 /* 触摸设备优化 */
@@ -68,21 +36,6 @@
     }
 }
 
-/* 移动端聊天面板键盘适配 */
-@media (max-width: 768px) {
-    /* 当键盘弹出时，确保输入框可见 */
-    #chat-panel {
-        height: 100dvh; /* 使用动态视口高度 */
-    }
-
-    /* iOS Safari 键盘适配 */
-    @supports (-webkit-touch-callout: none) {
-        #chat-panel {
-            height: -webkit-fill-available;
-        }
-    }
-}
-
 /* 横屏模式下的特殊处理 */
 @media (max-width: 768px) and (orientation: landscape) {
     /* 减少垂直空间占用 */
@@ -92,29 +45,6 @@
 
     #weather-container {
         margin-bottom: 1.2rem;
-    }
-
-    /* 聊天面板优化 */
-    #chat-header {
-        padding: 10px 12px;
-    }
-
-    #chat-input-area {
-        padding: 8px 12px;
-    }
-}
-
-/* 小屏幕设备的滚动条优化 */
-@media (max-width: 768px) {
-    /* 隐藏滚动条但保持滚动功能 */
-    #chat-messages::-webkit-scrollbar,
-    .chat-settings-content::-webkit-scrollbar {
-        width: 2px;
-    }
-
-    #chat-messages::-webkit-scrollbar-thumb,
-    .chat-settings-content::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.15);
     }
 }
 
@@ -166,10 +96,6 @@
 
 /* 平板设备优化 */
 @media (min-width: 769px) and (max-width: 1024px) {
-    #chat-panel {
-        width: 420px;
-    }
-
     #time {
         font-size: 6rem;
     }
@@ -188,13 +114,7 @@
     /* 增大最小触摸目标尺寸 (44x44px) */
     button,
     a,
-    input[type="checkbox"],
-    .chat-msg {
+    input[type="checkbox"] {
         min-height: 44px;
-    }
-
-    /* 确保按钮有足够的间距 */
-    #chat-header-actions {
-        gap: 8px;
     }
 }
