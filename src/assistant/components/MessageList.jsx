@@ -10,17 +10,17 @@ function FilePart({ part, index }) {
     const label = part.filename || `attachment-${index + 1}`;
 
     return (
-        <div className="chat-message-attachments">
+        <div className="assistant-message-attachments">
             {part.mediaType.startsWith('image/') ? (
                 <img
-                    className="chat-message-attachment-img"
+                    className="assistant-message-attachment-image"
                     src={part.url}
                     alt={label}
                     loading="lazy"
                 />
             ) : (
                 <a
-                    className="chat-file-link"
+                    className="assistant-file-link"
                     href={part.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -37,7 +37,7 @@ function ReasoningPart({ part, isStreaming }) {
     if (!part.text) return null;
 
     return (
-        <details className="chat-reasoning" open={isStreaming || undefined}>
+        <details className="assistant-reasoning" open={isStreaming || undefined}>
             <summary>Reasoning</summary>
             <MarkdownMessage text={part.text} isStreaming={isStreaming} />
         </details>
@@ -49,17 +49,17 @@ function SourcePart({ part }) {
 
     return part.type === 'source-url' ? (
         <a
-            className="chat-source-link"
+            className="assistant-source-link"
             href={part.url}
             target="_blank"
             rel="noopener noreferrer"
         >
             {label}
         </a>
-    ) : <span className="chat-source-link">{label}</span>;
+    ) : <span className="assistant-source-link">{label}</span>;
 }
 
-function renderPart(part, index, role, isStreaming) {
+function renderMessagePart(part, index, role, isStreaming) {
     switch (part.type) {
         case 'text':
             if (!part.text) return null;
@@ -96,7 +96,7 @@ function renderPart(part, index, role, isStreaming) {
     }
 }
 
-function hasRenderablePart(message) {
+function hasRenderableContent(message) {
     return message.parts.some((part) => {
         if (part.type === 'file') return Boolean(part.url);
         if (part.type === 'source-url' || part.type === 'source-document') return true;
@@ -105,18 +105,18 @@ function hasRenderablePart(message) {
     });
 }
 
-function Message({ message, isStreaming, isPending, onRegenerate }) {
+function MessageItem({ message, isStreaming, isPending, onRegenerate }) {
     const { role, parts } = message;
 
-    if (!hasRenderablePart(message)) return null;
+    if (!hasRenderableContent(message)) return null;
 
     return (
-        <div className={`chat-msg ${role}${isStreaming ? ' is-streaming' : ''}`}>
-            {parts.map((part, index) => renderPart(part, index, role, isStreaming))}
+        <div className={`assistant-message ${role}${isStreaming ? ' is-streaming' : ''}`}>
+            {parts.map((part, index) => renderMessagePart(part, index, role, isStreaming))}
             {role === 'assistant' ? (
                 <button
                     type="button"
-                    className="msg-regenerate-btn"
+                    className="assistant-regenerate-button"
                     title="Regenerate response"
                     aria-label="Regenerate response"
                     disabled={isPending}
@@ -135,37 +135,37 @@ export function MessageList({
     error,
     onRegenerate
 }) {
-    const localRef = useRef(null);
+    const listRef = useRef(null);
     const isPending = status === 'submitted' || status === 'streaming';
     const lastMessage = messages.at(-1);
-    const showPlaceholder = status === 'submitted'
+    const showStreamingPlaceholder = status === 'submitted'
         || (status === 'streaming' && (
             !lastMessage
             || lastMessage.role !== 'assistant'
-            || !hasRenderablePart(lastMessage)
+            || !hasRenderableContent(lastMessage)
         ));
 
     useLayoutEffect(() => {
-        const element = localRef.current;
-        element.scrollTo({ top: element.scrollHeight, behavior: 'auto' });
+        const list = listRef.current;
+        list.scrollTo({ top: list.scrollHeight, behavior: 'auto' });
     }, [messages, status, error]);
 
     return (
         <div
-            id="chat-messages"
-            ref={localRef}
+            id="assistant-messages"
+            ref={listRef}
             role="log"
             aria-live="polite"
             aria-relevant="additions text"
             aria-busy={isPending}
         >
             {messages.length === 0 && !isPending && !error ? (
-                <div id="chat-empty-state">
+                <div id="assistant-empty-state">
                     <Icon name="comments" />
                     <span>Start a conversation</span>
                 </div>
             ) : messages.map((message) => (
-                <Message
+                <MessageItem
                     key={message.id}
                     message={message}
                     isPending={isPending}
@@ -175,15 +175,15 @@ export function MessageList({
                         && message === lastMessage}
                 />
             ))}
-            {showPlaceholder ? (
-                <div className="chat-msg assistant is-streaming is-streaming-placeholder">
+            {showStreamingPlaceholder ? (
+                <div className="assistant-message assistant is-streaming is-streaming-placeholder">
                     Thinking...
                 </div>
             ) : null}
             {error ? (
-                <div className="chat-msg error" role="alert">
-                    <div className="chat-error-title">Unable to complete the request</div>
-                    <div className="chat-error-detail">{error}</div>
+                <div className="assistant-message error" role="alert">
+                    <div className="assistant-error-title">Unable to complete the request</div>
+                    <div className="assistant-error-detail">{error}</div>
                 </div>
             ) : null}
         </div>

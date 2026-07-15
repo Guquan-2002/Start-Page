@@ -4,7 +4,8 @@ import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { handleChatApi } from './src/server/chat-api.js';
+import { handleProviderApi } from './src/assistant/server/provider-api.js';
+import { handleNetworkStatusApi } from './src/dashboard/server/network-status-api.js';
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;
@@ -53,7 +54,11 @@ function resolvePath(urlPath) {
 }
 
 const server = createServer(async (request, response) => {
-  if (await handleChatApi(request, response)) {
+  if (await handleNetworkStatusApi(request, response)) {
+    return;
+  }
+
+  if (await handleProviderApi(request, response)) {
     return;
   }
 

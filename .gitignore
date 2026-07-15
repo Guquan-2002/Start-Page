@@ -1,9 +1,2 @@
 node_modules/
 dist/
-coverage/
-.pi-subagents/
-.env
-.env.*
-*.local
-.DS_Store
-

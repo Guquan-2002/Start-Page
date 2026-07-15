@@ -1,17 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-import { handleChatApi } from './src/server/chat-api.js';
+import { handleProviderApi } from './src/assistant/server/provider-api.js';
+import { handleNetworkStatusApi } from './src/dashboard/server/network-status-api.js';
 
 export default defineConfig({
     base: './',
     plugins: [
         react(),
         {
-        name: 'startpage-chat-api',
-        configureServer(server) {
-            server.middlewares.use(handleChatApi);
-        }
+            name: 'startpage-api',
+            configureServer(server) {
+                server.middlewares.use(handleNetworkStatusApi);
+                server.middlewares.use(handleProviderApi);
+            }
         }
     ],
     build: {

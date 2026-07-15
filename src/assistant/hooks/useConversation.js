@@ -1,8 +1,8 @@
-import { useChat as useAiChat } from '@ai-sdk/react';
+import { useChat as useAiConversation } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useEffect, useRef, useState } from 'react';
 
-function readFilePart(file) {
+function readAttachment(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
 
@@ -20,23 +20,23 @@ function readFilePart(file) {
     });
 }
 
-function getMissingConfig(config) {
-    if (!config.apiKey.trim()) return 'API Key is required.';
-    if (!config.model.trim()) return 'Model is required.';
+function getProviderConfigError(providerConfig) {
+    if (!providerConfig.apiKey.trim()) return 'API Key is required.';
+    if (!providerConfig.model.trim()) return 'Model is required.';
     return '';
 }
 
-export function useChat({ requestConfig, onRequireSettings }) {
+export function useConversation({ providerConfig, onRequireSettings }) {
     const [input, setInput] = useState('');
     const [attachments, setAttachments] = useState([]);
     const [localError, setLocalError] = useState('');
     const inputRef = useRef(null);
-    const requestConfigRef = useRef(requestConfig);
-    requestConfigRef.current = requestConfig;
+    const providerConfigRef = useRef(providerConfig);
+    providerConfigRef.current = providerConfig;
     const [transport] = useState(() => (
         new DefaultChatTransport({
-            api: '/api/chat',
-            body: () => ({ config: requestConfigRef.current })
+            api: '/api/provider',
+            body: () => ({ providerConfig: providerConfigRef.current })
         })
     ));
 
@@ -44,12 +44,12 @@ export function useChat({ requestConfig, onRequireSettings }) {
         messages,
         status,
         error,
-        sendMessage: sendAiMessage,
+        sendMessage: sendConversationMessage,
         regenerate,
         stop,
         setMessages,
         clearError
-    } = useAiChat({
+    } = useAiConversation({
         transport,
         onFinish: () => inputRef.current.focus()
     });
@@ -59,9 +59,9 @@ export function useChat({ requestConfig, onRequireSettings }) {
         const text = input.trim();
         if (!text && attachments.length === 0) return;
 
-        const configError = getMissingConfig(requestConfigRef.current);
-        if (configError) {
-            setLocalError(configError);
+        const providerConfigError = getProviderConfigError(providerConfigRef.current);
+        if (providerConfigError) {
+            setLocalError(providerConfigError);
             onRequireSettings();
             return;
         }
@@ -71,20 +71,20 @@ export function useChat({ requestConfig, onRequireSettings }) {
         setInput('');
         setAttachments([]);
 
-        await sendAiMessage(text
+        await sendConversationMessage(text
             ? { text, files: attachments }
             : { files: attachments });
     };
 
-    const addFiles = async (files) => {
-        const images = files.filter((file) => file.type.startsWith('image/'));
-        if (images.length === 0) return;
+    const addAttachments = async (files) => {
+        const imageFiles = files.filter((file) => file.type.startsWith('image/'));
+        if (imageFiles.length === 0) return;
 
         try {
-            const parts = await Promise.all(
-                images.map((file) => readFilePart(file))
+            const newAttachments = await Promise.all(
+                imageFiles.map((file) => readAttachment(file))
             );
-            setAttachments((current) => [...current, ...parts]);
+            setAttachments((current) => [...current, ...newAttachments]);
             setLocalError('');
         } catch (readError) {
             setLocalError(readError.message);
@@ -95,7 +95,7 @@ export function useChat({ requestConfig, onRequireSettings }) {
         setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
     };
 
-    const regenerateMessage = (messageId) => {
+    const regenerateResponse = (messageId) => {
         setLocalError('');
         clearError();
         return regenerate({ messageId });
@@ -120,12 +120,12 @@ export function useChat({ requestConfig, onRequireSettings }) {
         setInput,
         inputRef,
         attachments,
-        addFiles,
+        addAttachments,
         removeAttachment,
         isStreaming,
         sendMessage,
         stopGeneration: stop,
         clearConversation,
-        regenerateMessage
+        regenerateResponse
     };
 }

@@ -1,0 +1,23 @@
+.dashboard {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100dvh;
+    padding: clamp(12px, 2vw, 20px);
+    position: relative;
+    z-index: 2;
+}
+
+@media (max-width: 768px) {
+    .dashboard {
+        justify-content: flex-start;
+        padding-top: clamp(12vh, 15vw, 15vh);
+    }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .dashboard {
+        padding-top: 8vh;
+    }
+}

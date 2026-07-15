@@ -1,7 +1,41 @@
-import { useEffect, useRef } from 'react';
-import './BackgroundEffects.css';
+import { useEffect, useRef, useState } from 'react';
+import './PageTheme.css';
 
+const TIME_THEME_CLASSES = ['morning', 'day', 'evening', 'night'];
+const THEME_CHECK_INTERVAL = 60 * 1000;
 const STAR_COUNTS = { small: 300, medium: 80, big: 40 };
+
+function getTimeTheme(hour) {
+    if (hour >= 6 && hour < 8) return 'morning';
+    if (hour >= 8 && hour < 16) return 'day';
+    if (hour >= 16 && hour < 18) return 'evening';
+    return 'night';
+}
+
+function useTimeTheme() {
+    const [theme, setTheme] = useState(() => getTimeTheme(new Date().getHours()));
+
+    useEffect(() => {
+        const body = document.body;
+
+        const updateTheme = () => {
+            const nextTheme = getTimeTheme(new Date().getHours());
+            body.classList.remove(...TIME_THEME_CLASSES);
+            body.classList.add(nextTheme);
+            setTheme(nextTheme);
+        };
+
+        updateTheme();
+        const timerId = window.setInterval(updateTheme, THEME_CHECK_INTERVAL);
+
+        return () => {
+            window.clearInterval(timerId);
+            body.classList.remove(...TIME_THEME_CLASSES);
+        };
+    }, []);
+
+    return theme;
+}
 
 function appendStars(stars, count, width, height, options) {
     for (let index = 0; index < count; index += 1) {
@@ -51,7 +85,8 @@ function createStars(width, height) {
     return stars;
 }
 
-export function BackgroundEffects({ active }) {
+export function PageTheme() {
+    const active = useTimeTheme() === 'night';
     const canvasRef = useRef(null);
 
     useEffect(() => {

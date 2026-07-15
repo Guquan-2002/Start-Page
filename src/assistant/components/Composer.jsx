@@ -1,13 +1,13 @@
 import { useLayoutEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
-import './ChatComposer.css';
+import './Composer.css';
 
-export function ChatComposer({
+export function Composer({
     input,
     setInput,
     attachments,
-    onAddFiles,
+    onAddAttachments,
     onRemoveAttachment,
     onSend,
     onStop,
@@ -22,22 +22,22 @@ export function ChatComposer({
         textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }, [input, inputRef]);
 
-    const handleFileChange = (event) => {
-        onAddFiles(Array.from(event.target.files));
+    const handleAttachmentChange = (event) => {
+        onAddAttachments(Array.from(event.target.files));
         event.target.value = '';
     };
 
-    const handlePaste = (event) => {
+    const handleAttachmentPaste = (event) => {
         const pastedImages = Array.from(event.clipboardData.items)
             .filter((item) => item.type.startsWith('image/'))
             .map((item) => item.getAsFile());
 
         if (pastedImages.length === 0) return;
         event.preventDefault();
-        onAddFiles(pastedImages);
+        onAddAttachments(pastedImages);
     };
 
-    const handleKeyDown = (event) => {
+    const handleSubmitKeyDown = (event) => {
         if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
@@ -50,20 +50,20 @@ export function ChatComposer({
         : `已上传 ${attachments.length} 张图片`;
 
     return (
-        <div id="chat-input-area">
+        <div id="assistant-composer">
             <input
                 ref={fileInputRef}
                 type="file"
-                id="chat-image-input"
+                id="assistant-attachment-input"
                 accept="image/*"
                 multiple
                 hidden
                 disabled={isStreaming}
-                onChange={handleFileChange}
+                onChange={handleAttachmentChange}
             />
             <button
                 type="button"
-                id="chat-attach-btn"
+                id="assistant-attachment-button"
                 className={attachments.length > 0 ? 'has-attachments' : undefined}
                 title={attachmentTitle}
                 aria-label={attachmentTitle}
@@ -72,20 +72,20 @@ export function ChatComposer({
             >
                 <Icon name="image" />
             </button>
-            <div id="chat-input-stack">
-                <div id="chat-attachments">
+            <div id="assistant-composer-content">
+                <div id="assistant-attachments">
                     {attachments.map((attachment, index) => {
                         const label = attachment.filename;
                         return (
                             <div
                                 key={`${attachment.url.slice(0, 48)}-${label}-${index}`}
-                                className="chat-attachment-chip"
+                                className="assistant-attachment"
                                 title={attachment.filename}
                             >
                                 <img src={attachment.url} alt={label} />
                                 <button
                                     type="button"
-                                    className="chat-attachment-remove"
+                                    className="assistant-attachment-remove-button"
                                     title="Remove image"
                                     aria-label={`Remove image ${index + 1}`}
                                     disabled={isStreaming}
@@ -99,20 +99,20 @@ export function ChatComposer({
                 </div>
                 <textarea
                     ref={inputRef}
-                    id="chat-input"
+                    id="assistant-input"
                     placeholder="Type your message..."
                     rows={1}
                     value={input}
                     disabled={isStreaming}
                     onChange={(event) => setInput(event.target.value)}
-                    onPaste={handlePaste}
-                    onKeyDown={handleKeyDown}
+                    onPaste={handleAttachmentPaste}
+                    onKeyDown={handleSubmitKeyDown}
                 />
             </div>
             {isStreaming ? (
                 <button
                     type="button"
-                    id="chat-stop-btn"
+                    id="assistant-stop-button"
                     title="Stop generation"
                     aria-label="Stop generation"
                     onClick={onStop}
@@ -122,7 +122,7 @@ export function ChatComposer({
             ) : (
                 <button
                     type="button"
-                    id="chat-send-btn"
+                    id="assistant-send-button"
                     className={input.trim().length > 0 ? 'has-text' : undefined}
                     title="Send"
                     aria-label="Send"

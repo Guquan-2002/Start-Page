@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './Clock.css';
 
 const TIME_UPDATE_INTERVAL = 1000;
 
@@ -13,7 +14,7 @@ function formatClock(now) {
     };
 }
 
-export function useClock() {
+export function Clock() {
     const [now, setNow] = useState(() => new Date());
 
     useEffect(() => {
@@ -24,5 +25,12 @@ export function useClock() {
         return () => window.clearInterval(timerId);
     }, []);
 
-    return formatClock(now);
+    const clock = formatClock(now);
+
+    return (
+        <div id="time-container" role="timer" aria-label="Current time">
+            <div id="time">{clock.time}</div>
+            <div id="date">{clock.date}</div>
+        </div>
+    );
 }

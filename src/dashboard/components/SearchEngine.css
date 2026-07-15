@@ -1,0 +1,92 @@
+#search-container {
+    width: 100%;
+    max-width: 600px;
+}
+
+#search-form {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: clamp(14px, 1.5vw, 22px);
+    color: var(--placeholder-color);
+    font-size: clamp(1rem, 1.2vw, 1.3rem);
+    transition: color 0.3s ease;
+    pointer-events: none;
+}
+
+#search-input {
+    width: 100%;
+    padding: clamp(14px, 1.5vw, 20px) clamp(16px, 2vw, 24px)
+        clamp(14px, 1.5vw, 20px) clamp(42px, 4vw, 55px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 30px;
+    background-color: var(--component-bg);
+    color: var(--text-color);
+    font-size: clamp(1.2rem, 1.2vw, 1.3rem);
+    backdrop-filter: blur(10px);
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+#search-input::placeholder {
+    color: var(--placeholder-color);
+}
+
+#search-input:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+#search-input:focus {
+    outline: none;
+    background-color: var(--component-bg-focus);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: var(--component-shadow-focus), 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+#search-input:focus ~ .search-icon {
+    color: var(--text-color);
+}
+
+#network-status {
+    position: fixed;
+    bottom: clamp(12px, 1.5vw, 15px);
+    right: clamp(15px, 2vw, 20px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: clamp(5px, 0.8vw, 6px) clamp(8px, 1vw, 10px);
+    border-radius: 10px;
+    z-index: 10;
+    backdrop-filter: blur(5px);
+}
+
+#network-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--net-checking);
+    transition: background-color 0.5s ease;
+}
+
+#network-indicator.google-ok { background-color: var(--net-ok-global); }
+#network-indicator.bing-ok { background-color: var(--net-ok-local); }
+#network-indicator.net-fail { background-color: var(--net-fail); }
+
+@media (max-width: 768px) {
+    #search-container {
+        max-width: 100%;
+        padding: 0 10px;
+    }
+
+    #network-indicator {
+        width: 9px;
+        height: 9px;
+    }
+}

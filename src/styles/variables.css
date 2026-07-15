@@ -14,16 +14,16 @@
     --component-bg-focus: rgba(255, 255, 255, 0.25);
     --component-shadow-focus: 0 0 15px rgba(0, 0, 0, 0.2);
 
-    --chat-panel-bg: rgba(20, 20, 30, 0.85);
-    --chat-overlay-bg-start: rgba(16, 22, 34, 0.97);
-    --chat-overlay-bg-end: rgba(14, 20, 32, 0.95);
-    --chat-border: rgba(255, 255, 255, 0.1);
-    --chat-muted-border: rgba(255, 255, 255, 0.16);
-    --chat-soft-bg: rgba(255, 255, 255, 0.08);
-    --chat-accent: rgba(100, 140, 255, 0.4);
-    --chat-accent-strong: rgba(100, 140, 255, 0.6);
-    --chat-danger: rgba(255, 80, 80, 0.4);
-    --chat-danger-strong: rgba(255, 80, 80, 0.6);
+    --assistant-panel-bg: rgba(20, 20, 30, 0.85);
+    --assistant-overlay-bg-start: rgba(16, 22, 34, 0.97);
+    --assistant-overlay-bg-end: rgba(14, 20, 32, 0.95);
+    --assistant-border: rgba(255, 255, 255, 0.1);
+    --assistant-muted-border: rgba(255, 255, 255, 0.16);
+    --assistant-soft-bg: rgba(255, 255, 255, 0.08);
+    --assistant-accent: rgba(100, 140, 255, 0.4);
+    --assistant-accent-strong: rgba(100, 140, 255, 0.6);
+    --assistant-danger: rgba(255, 80, 80, 0.4);
+    --assistant-danger-strong: rgba(255, 80, 80, 0.6);
 
     --net-ok-global: #66CCFF;
     --net-ok-local: #00EE00;

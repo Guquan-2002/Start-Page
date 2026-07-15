@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Icon } from '../../shared/Icon.jsx';
+import './Weather.css';
 
 const WEATHER_API_KEY_STORAGE_KEY = 'startpage_weather_api_key';
 const WEATHER_SETUP_PROMPT_FLAG_KEY = 'startpage_weather_setup_prompted';
@@ -72,11 +74,11 @@ function promptWeatherSetupIfNeeded() {
     return true;
 }
 
-export function useWeather(isGoogleAvailable) {
+export function Weather({ networkEngine }) {
     const [weather, setWeather] = useState(INITIAL_WEATHER);
 
     useEffect(() => {
-        if (promptWeatherSetupIfNeeded() || isGoogleAvailable === null) {
+        if (promptWeatherSetupIfNeeded() || networkEngine === null) {
             return;
         }
 
@@ -126,7 +128,7 @@ export function useWeather(isGoogleAvailable) {
                 details: '正在获取天气...'
             });
 
-            const apiUrl = isGoogleAvailable
+            const apiUrl = networkEngine === 'google'
                 ? WEATHER_API_URLS.googleAvailable
                 : WEATHER_API_URLS.default;
             return updateWeather(apiUrl);
@@ -141,7 +143,22 @@ export function useWeather(isGoogleAvailable) {
             disposed = true;
             window.clearInterval(intervalId);
         };
-    }, [isGoogleAvailable]);
+    }, [networkEngine]);
 
-    return weather;
+    return (
+        <a
+            id="weather-container"
+            href="https://weather.cma.cn/web/weather"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Weather information"
+        >
+            <Icon
+                id="weather-icon"
+                name={weather.icon}
+                spin={weather.spinning}
+            />
+            <span id="weather-details">{weather.details}</span>
+        </a>
+    );
 }

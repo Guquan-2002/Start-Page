@@ -2,7 +2,7 @@ import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import './MarkdownMessage.css';
 
-function SimpleCode({ node, className, children, ...props }) {
+function CodeRenderer({ node, className, children, ...props }) {
     // Block-level code (fenced code blocks) — render simple <pre><code>
     if ('data-block' in props) {
         const { 'data-block': _, ...rest } = props;
@@ -25,7 +25,7 @@ export function MarkdownMessage({ text, isStreaming }) {
         <Streamdown
             mode={isStreaming ? 'streaming' : 'static'}
             isAnimating={isStreaming}
-            components={{ code: SimpleCode }}
+            components={{ code: CodeRenderer }}
         >
             {text}
         </Streamdown>

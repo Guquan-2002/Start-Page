@@ -1,11 +1,11 @@
-import { ChatFeature } from './chat/ChatFeature.jsx';
-import { StartPage } from './start-page/StartPage.jsx';
+import { Assistant } from './assistant/Assistant.jsx';
+import { Dashboard } from './dashboard/Dashboard.jsx';
 
 export default function App() {
     return (
         <>
-            <StartPage />
-            <ChatFeature />
+            <Dashboard />
+            <Assistant />
         </>
     );
 }

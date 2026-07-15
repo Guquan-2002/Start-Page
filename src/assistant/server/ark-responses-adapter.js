@@ -48,7 +48,7 @@ function getArkMetadata(message) {
     return message?.metadata?.ark;
 }
 
-export function prepareArkConversation(uiMessages, config) {
+export function prepareArkConversation(uiMessages, providerConfig) {
     const fallbackInput = buildArkHistoryInput(uiMessages);
     let assistantIndex = -1;
 
@@ -64,8 +64,8 @@ export function prepareArkConversation(uiMessages, config) {
         : null;
     const canContinue = Boolean(
         metadata?.responseId
-        && metadata.model === config.model
-        && metadata.apiUrl === config.apiUrl
+        && metadata.model === providerConfig.model
+        && metadata.apiUrl === providerConfig.apiUrl
         && assistantIndex < uiMessages.length - 1
     );
 
@@ -76,14 +76,14 @@ export function prepareArkConversation(uiMessages, config) {
     };
 }
 
-export function getArkMessageMetadata(part, config) {
+export function getArkMessageMetadata(part, providerConfig) {
     if (part?.type !== 'finish-step' || !part.response?.id) return undefined;
 
     return {
         ark: {
             responseId: part.response.id,
-            model: config.model,
-            apiUrl: config.apiUrl
+            model: providerConfig.model,
+            apiUrl: providerConfig.apiUrl
         }
     };
 }
@@ -101,44 +101,47 @@ function normalizeArkInput(input, fallbackInput, hasPreviousResponseId) {
         : fallbackInput;
 }
 
-export function buildArkRequestBody(rawBody, { config, fallbackInput }) {
+export function buildArkRequestBody(rawRequestBody, { providerConfig, fallbackInput }) {
     const {
         include,
         input,
         instructions,
         previous_response_id: previousResponseId,
         reasoning,
-        ...body
-    } = rawBody;
+        ...requestBody
+    } = rawRequestBody;
     const useFullHistory = input.some((item) => item?.type === 'item_reference');
 
-    body.input = useFullHistory
+    requestBody.input = useFullHistory
         ? fallbackInput
         : normalizeArkInput(input, fallbackInput, Boolean(previousResponseId));
-    body.store = true;
+    requestBody.store = true;
 
     if (!useFullHistory && previousResponseId) {
-        body.previous_response_id = previousResponseId;
+        requestBody.previous_response_id = previousResponseId;
     }
-    if (config.systemPrompt) {
-        body.instructions = config.systemPrompt;
+    if (providerConfig.systemPrompt) {
+        requestBody.instructions = providerConfig.systemPrompt;
     } else if (instructions) {
-        body.instructions = instructions;
+        requestBody.instructions = instructions;
     }
 
-    if (config.reasoning) {
-        body.thinking = { type: 'enabled' };
-        body.reasoning = { effort: config.reasoning };
+    if (providerConfig.reasoning) {
+        requestBody.thinking = { type: 'enabled' };
+        requestBody.reasoning = { effort: providerConfig.reasoning };
     }
 
-    return body;
+    return requestBody;
 }
 
-export function createArkFetch({ config, fallbackInput, fetchImpl = globalThis.fetch }) {
+export function createArkFetch({ providerConfig, fallbackInput, fetchImpl = globalThis.fetch }) {
     return (input, init) => {
-        const rawBody = JSON.parse(init.body);
+        const rawRequestBody = JSON.parse(init.body);
 
-        const requestBody = buildArkRequestBody(rawBody, { config, fallbackInput });
+        const requestBody = buildArkRequestBody(rawRequestBody, {
+            providerConfig,
+            fallbackInput
+        });
         return fetchImpl(input, {
             ...init,
             body: JSON.stringify(requestBody)
