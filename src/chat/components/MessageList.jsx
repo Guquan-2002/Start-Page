@@ -1,15 +1,9 @@
-import { lazy, Suspense, useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
 import { MAX_RENDERED_MESSAGES } from '../constants.js';
-
-const MarkdownMessage = lazy(() => import('./MarkdownMessage.jsx').then((module) => ({
-    default: module.MarkdownMessage
-})));
-
-function isImagePart(part) {
-    return part.mediaType === 'image' || part.mediaType?.startsWith('image/');
-}
+import { isImageAttachment } from '../../shared/attachment-utils.js';
+import { MarkdownMessage } from './MarkdownMessage.jsx';
 
 function FilePart({ part, index }) {
     if (!part.url) return null;
@@ -17,10 +11,10 @@ function FilePart({ part, index }) {
     const label = part.filename || `attachment-${index + 1}`;
 
     return (
-        <div className="chat-user-images">
-            {isImagePart(part) ? (
+        <div className="chat-message-attachments">
+            {isImageAttachment(part) ? (
                 <img
-                    className="chat-user-image"
+                    className="chat-message-attachment-img"
                     src={part.url}
                     alt={label}
                     loading="lazy"
@@ -46,9 +40,7 @@ function ReasoningPart({ part, isStreaming }) {
     return (
         <details className="chat-reasoning" open={isStreaming || undefined}>
             <summary>Reasoning</summary>
-            <Suspense fallback={<div>{part.text}</div>}>
-                <MarkdownMessage text={part.text} isStreaming={isStreaming} />
-            </Suspense>
+            <MarkdownMessage text={part.text} isStreaming={isStreaming} />
         </details>
     );
 }
@@ -73,12 +65,11 @@ function renderPart(part, index, { role, isStreaming }) {
         case 'text':
             if (!part.text) return null;
             return role === 'assistant' ? (
-                <Suspense key={`text-${index}`} fallback={<div>{part.text}</div>}>
-                    <MarkdownMessage
-                        text={part.text}
-                        isStreaming={isStreaming && part.state !== 'done'}
-                    />
-                </Suspense>
+                <MarkdownMessage
+                    key={`text-${index}`}
+                    text={part.text}
+                    isStreaming={isStreaming && part.state !== 'done'}
+                />
             ) : (
                 <span key={`text-${index}`}>{part.text}</span>
             );
@@ -177,12 +168,7 @@ export function MessageList({
     useLayoutEffect(() => {
         const element = localRef.current;
         if (!element) return;
-
-        if (typeof element.scrollTo === 'function') {
-            element.scrollTo({ top: element.scrollHeight, behavior: 'auto' });
-        } else {
-            element.scrollTop = element.scrollHeight;
-        }
+        element.scrollTo({ top: element.scrollHeight, behavior: 'auto' });
     }, [visibleMessages, status, error]);
 
     return (

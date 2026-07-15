@@ -2,30 +2,25 @@ import { useChat as useAiChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-function readFilePart(file, readers) {
+function readFilePart(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        const settle = (callback) => {
-            readers.delete(reader);
-            callback();
-        };
 
-        reader.onload = () => settle(() => resolve({
+        reader.onload = () => resolve({
             type: 'file',
             mediaType: file.type || 'application/octet-stream',
             filename: file.name || undefined,
             url: String(reader.result)
-        }));
-        reader.onerror = () => settle(() => reject(
+        });
+        reader.onerror = () => reject(
             new Error(`Failed to read ${file.name || 'attachment'}.`)
-        ));
-        reader.onabort = () => settle(() => {
+        );
+        reader.onabort = () => {
             const error = new Error('Attachment reading was cancelled.');
             error.name = 'AbortError';
             reject(error);
-        });
+        };
 
-        readers.add(reader);
         reader.readAsDataURL(file);
     });
 }
@@ -41,7 +36,6 @@ export function useChat({ requestConfig, onRequireSettings }) {
     const [attachments, setAttachments] = useState([]);
     const [localError, setLocalError] = useState('');
     const inputRef = useRef(null);
-    const readersRef = useRef(new Set());
     const requestConfigRef = useRef(requestConfig);
     const transportRef = useRef(null);
     requestConfigRef.current = requestConfig;
@@ -97,7 +91,7 @@ export function useChat({ requestConfig, onRequireSettings }) {
 
         try {
             const parts = await Promise.all(
-                images.map((file) => readFilePart(file, readersRef.current))
+                images.map((file) => readFilePart(file))
             );
             setAttachments((current) => [...current, ...parts]);
             setLocalError('');
@@ -129,11 +123,7 @@ export function useChat({ requestConfig, onRequireSettings }) {
         inputRef.current?.focus();
     }, [clearError, isStreaming, setMessages]);
 
-    useEffect(() => () => {
-        readersRef.current.forEach((reader) => reader.abort());
-        readersRef.current.clear();
-        void stop();
-    }, [stop]);
+    useEffect(() => () => { void stop(); }, [stop]);
 
     return {
         messages,

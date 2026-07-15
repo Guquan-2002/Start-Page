@@ -7,11 +7,11 @@ import { ChatSettings } from './config/ChatSettings.jsx';
 import { useChatConfig } from './config/useChatConfig.js';
 import { useChat } from './useChat.js';
 
-const PANEL_MODE = Object.freeze({
+const PANEL_MODE = {
     closed: 'closed',
     chat: 'chat',
     settings: 'settings'
-});
+};
 
 export function ChatFeature() {
     const [mode, setMode] = useState(PANEL_MODE.closed);
@@ -50,7 +50,7 @@ export function ChatFeature() {
         if (!target) return undefined;
         const frameId = requestAnimationFrame(() => target.focus());
         return () => cancelAnimationFrame(frameId);
-    }, [chat.inputRef, mode]);
+    }, [mode]);
 
     const openChat = useCallback(() => {
         setMode(PANEL_MODE.chat);
@@ -139,7 +139,6 @@ export function ChatFeature() {
                     chatConfig={chatConfig}
                     isOpen={settingsOpen}
                     onClose={closeSettings}
-                    onSaved={undefined}
                 />
 
                 <MessageList
@@ -147,7 +146,6 @@ export function ChatFeature() {
                     status={chat.status}
                     error={chat.error}
                     onRegenerate={chat.regenerateMessage}
-
                     inert={settingsOpen}
                 />
 

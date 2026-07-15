@@ -1,15 +1,6 @@
-export const CHAT_PROVIDER_IDS = Object.freeze({
-    gemini: 'gemini',
-    openai: 'openai',
-    openaiResponses: 'openai_responses',
-    deepseek: 'deepseek',
-    arkResponses: 'ark_responses',
-    anthropic: 'anthropic'
-});
-
-const PROVIDERS = Object.freeze([
+const PROVIDER_DATA = [
     {
-        id: CHAT_PROVIDER_IDS.gemini,
+        id: 'gemini',
         settingsLabel: 'Gemini',
         defaults: {
             apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
@@ -31,7 +22,7 @@ const PROVIDERS = Object.freeze([
         }
     },
     {
-        id: CHAT_PROVIDER_IDS.openai,
+        id: 'openai',
         settingsLabel: 'OpenAI (Chat Completions)',
         defaults: {
             apiUrl: 'https://api.openai.com/v1',
@@ -54,7 +45,7 @@ const PROVIDERS = Object.freeze([
         }
     },
     {
-        id: CHAT_PROVIDER_IDS.openaiResponses,
+        id: 'openai_responses',
         settingsLabel: 'OpenAI (Responses)',
         defaults: {
             apiUrl: 'https://api.openai.com/v1',
@@ -76,7 +67,7 @@ const PROVIDERS = Object.freeze([
         }
     },
     {
-        id: CHAT_PROVIDER_IDS.deepseek,
+        id: 'deepseek',
         settingsLabel: 'DeepSeek',
         defaults: {
             apiUrl: 'https://api.deepseek.com',
@@ -99,7 +90,7 @@ const PROVIDERS = Object.freeze([
         }
     },
     {
-        id: CHAT_PROVIDER_IDS.arkResponses,
+        id: 'ark_responses',
         settingsLabel: 'Volcengine Ark (Responses)',
         defaults: {
             apiUrl: 'https://ark.cn-beijing.volces.com/api/v3',
@@ -121,7 +112,7 @@ const PROVIDERS = Object.freeze([
         }
     },
     {
-        id: CHAT_PROVIDER_IDS.anthropic,
+        id: 'anthropic',
         settingsLabel: 'Anthropic',
         defaults: {
             apiUrl: 'https://api.anthropic.com/v1',
@@ -142,30 +133,30 @@ const PROVIDERS = Object.freeze([
             note: 'Uses Anthropic web search.'
         }
     }
-].map((provider) => Object.freeze(provider)));
+];
 
-const PROVIDER_BY_ID = new Map(PROVIDERS.map((provider) => [provider.id, provider]));
+const PROVIDER_BY_ID = new Map(PROVIDER_DATA.map((p) => [p.id, p]));
 
-export const CHAT_DEFAULTS = Object.freeze({
-    provider: CHAT_PROVIDER_IDS.gemini,
+export const CHAT_DEFAULTS = {
+    provider: 'gemini',
     systemPrompt: 'You are a helpful assistant.'
-});
+};
 
 export function resolveProviderId(value, fallback = CHAT_DEFAULTS.provider) {
-    const providerId = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    return PROVIDER_BY_ID.has(providerId) ? providerId : fallback;
+    const id = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return PROVIDER_BY_ID.has(id) ? id : fallback;
 }
 
 export function getProviderIds() {
-    return PROVIDERS.map(({ id }) => id);
+    return PROVIDER_DATA.map(({ id }) => id);
 }
 
 export function getProviderDefinitions() {
-    return [...PROVIDERS];
+    return PROVIDER_DATA;
 }
 
 export function getProviderDefinition(providerId) {
-    return PROVIDER_BY_ID.get(resolveProviderId(providerId)) || null;
+    return PROVIDER_BY_ID.get(providerId) || null;
 }
 
 export function getProviderDefaults(providerId) {

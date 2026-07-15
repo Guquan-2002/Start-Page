@@ -1,11 +1,7 @@
-import { useCallback, useImperativeHandle, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
-
-function isImageAttachment(attachment) {
-    return attachment.mediaType === 'image'
-        || attachment.mediaType?.startsWith('image/');
-}
+import { isImageAttachment } from '../../shared/attachment-utils.js';
 
 export function ChatComposer({
     input = '',
@@ -19,19 +15,14 @@ export function ChatComposer({
     inputRef,
     inert = false
 }) {
-    const localInputRef = useRef(null);
     const fileInputRef = useRef(null);
-    useImperativeHandle(inputRef, () => localInputRef.current);
 
     useLayoutEffect(() => {
-        const textarea = localInputRef.current;
-        if (!textarea) {
-            return;
-        }
-
+        const textarea = inputRef?.current;
+        if (!textarea) return;
         textarea.style.height = 'auto';
         textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-    }, [input]);
+    }, [input, inputRef]);
 
     const handleFileChange = useCallback((event) => {
         onAddFiles?.(Array.from(event.target.files));
@@ -48,10 +39,7 @@ export function ChatComposer({
             ? pastedImages
             : Array.from(event.clipboardData?.files || []);
 
-        if (imageFiles.length === 0) {
-            return;
-        }
-
+        if (imageFiles.length === 0) return;
         event.preventDefault();
         onAddFiles?.(imageFiles);
     }, [onAddFiles]);
@@ -66,7 +54,6 @@ export function ChatComposer({
         if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) {
             return;
         }
-
         event.preventDefault();
         handleSend();
     }, [handleSend]);
@@ -104,7 +91,6 @@ export function ChatComposer({
                 <div id="chat-attachments">
                     {attachments.map((attachment, index) => {
                         const label = attachment.filename || `attachment-${index + 1}`;
-
                         return (
                             <div
                                 key={`${attachment.url.slice(0, 48)}-${label}-${index}`}
@@ -131,7 +117,7 @@ export function ChatComposer({
                     })}
                 </div>
                 <textarea
-                    ref={localInputRef}
+                    ref={inputRef}
                     id="chat-input"
                     placeholder="Type your message..."
                     rows={1}
@@ -142,28 +128,28 @@ export function ChatComposer({
                     onKeyDown={handleKeyDown}
                 />
             </div>
-            <button
-                type="button"
-                id="chat-stop-btn"
-                title="Stop generation"
-                aria-label="Stop generation"
-                style={{ display: isStreaming ? undefined : 'none' }}
-                onClick={() => onStop?.()}
-            >
-                <Icon name="stop" />
-            </button>
-            <button
-                type="button"
-                id="chat-send-btn"
-                className={input.trim().length > 0 ? 'has-text' : undefined}
-                title="Send"
-                aria-label="Send"
-                disabled={isStreaming}
-                style={{ display: isStreaming ? 'none' : undefined }}
-                onClick={handleSend}
-            >
-                <Icon name="send" />
-            </button>
+            {isStreaming ? (
+                <button
+                    type="button"
+                    id="chat-stop-btn"
+                    title="Stop generation"
+                    aria-label="Stop generation"
+                    onClick={() => onStop?.()}
+                >
+                    <Icon name="stop" />
+                </button>
+            ) : (
+                <button
+                    type="button"
+                    id="chat-send-btn"
+                    className={input.trim().length > 0 ? 'has-text' : undefined}
+                    title="Send"
+                    aria-label="Send"
+                    onClick={handleSend}
+                >
+                    <Icon name="send" />
+                </button>
+            )}
         </div>
     );
 }

@@ -5,12 +5,14 @@ import {
     toUIMessageStream
 } from 'ai';
 
-import {
-    CHAT_PROVIDER_IDS as PROVIDERS,
-    getProviderDefinition,
-    getProviderIds
-} from '../chat/providers/provider-registry.js';
+import { getProviderDefinition, getProviderIds } from '../chat/providers/provider-registry.js';
 import { asTrimmedString } from '../shared/string-utils.js';
+import {
+    createArkFetch,
+    getArkMessageMetadata,
+    normalizeArkBaseUrl,
+    prepareArkConversation
+} from './ark-responses.js';
 
 const CHAT_API_PATH = '/api/chat';
 const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
@@ -114,6 +116,7 @@ function normalizeConfig(rawConfig) {
     const model = asTrimmedString(rawConfig.model);
     if (!apiKey) throw new ChatApiError(400, 'API Key is required.');
     if (!model) throw new ChatApiError(400, 'Model is required.');
+    const normalizedApiUrl = normalizeBaseUrl(rawConfig.apiUrl);
 
     const reasoning = asTrimmedString(rawConfig.reasoning).toLowerCase();
     if (
@@ -126,7 +129,9 @@ function normalizeConfig(rawConfig) {
 
     return {
         provider,
-        apiUrl: normalizeBaseUrl(rawConfig.apiUrl),
+        apiUrl: provider === 'ark_responses'
+            ? normalizeArkBaseUrl(normalizedApiUrl)
+            : normalizedApiUrl,
         apiKey,
         model,
         reasoning,
@@ -144,7 +149,7 @@ function buildProviderOptions(config) {
     const { provider, reasoning } = config;
     if (!reasoning) return undefined;
 
-    if (provider === PROVIDERS.openai || provider === PROVIDERS.openaiResponses) {
+    if (provider === 'openai' || provider === 'openai_responses') {
         return {
             openai: {
                 reasoningEffort: isReasoningDisabled(reasoning) ? 'none' : reasoning
@@ -152,7 +157,7 @@ function buildProviderOptions(config) {
         };
     }
 
-    if (provider === PROVIDERS.deepseek) {
+    if (provider === 'deepseek') {
         if (isReasoningDisabled(reasoning)) {
             return { deepseek: { thinking: { type: 'disabled' } } };
         }
@@ -164,7 +169,7 @@ function buildProviderOptions(config) {
         };
     }
 
-    if (provider === PROVIDERS.anthropic) {
+    if (provider === 'anthropic') {
         if (isReasoningDisabled(reasoning)) {
             return { anthropic: { thinking: { type: 'disabled' } } };
         }
@@ -176,7 +181,7 @@ function buildProviderOptions(config) {
         };
     }
 
-    if (provider === PROVIDERS.gemini) {
+    if (provider === 'gemini') {
         if (isReasoningDisabled(reasoning)) {
             return {
                 google: {
@@ -194,42 +199,26 @@ function buildProviderOptions(config) {
     return undefined;
 }
 
-function makeArkFetch(config) {
-    return async (input, init = {}) => {
-        if (typeof init.body !== 'string') return fetch(input, init);
-        try {
-            const body = JSON.parse(init.body);
-            if (isReasoningDisabled(config.reasoning)) {
-                const { reasoning: _, ...rest } = body;
-                return fetch(input, { ...init, body: JSON.stringify({ ...rest, thinking: { type: 'disabled' } }) });
-            }
-            return fetch(input, { ...init, body: JSON.stringify({ ...body, thinking: { type: 'enabled' }, reasoning: { ...(body.reasoning || {}), effort: config.reasoning } }) });
-        } catch {
-            return fetch(input, init);
-        }
-    };
-}
-
-async function createProviderRuntime(config) {
+async function createProviderRuntime(config, arkConversation) {
     const providerOptions = buildProviderOptions(config);
 
     if (
-        config.provider === PROVIDERS.openai
-        || config.provider === PROVIDERS.openaiResponses
-        || config.provider === PROVIDERS.arkResponses
+        config.provider === 'openai'
+        || config.provider === 'openai_responses'
+        || config.provider === 'ark_responses'
     ) {
         const { createOpenAI } = await import('@ai-sdk/openai');
-        const isArk = config.provider === PROVIDERS.arkResponses;
+        const isArk = config.provider === 'ark_responses';
         const provider = createOpenAI({
             apiKey: config.apiKey,
             baseURL: config.apiUrl,
             name: isArk ? 'ark' : 'openai',
-            fetch: isArk && config.reasoning
-                ? makeArkFetch(config)
+            fetch: isArk
+                ? createArkFetch({ config, fallbackInput: arkConversation.fallbackInput })
                 : undefined
         });
 
-        if (config.provider === PROVIDERS.openai) {
+        if (config.provider === 'openai') {
             return {
                 model: provider.chat(config.model),
                 providerOptions,
@@ -239,14 +228,22 @@ async function createProviderRuntime(config) {
 
         return {
             model: provider.responses(config.model),
-            providerOptions: isArk ? undefined : providerOptions,
+            providerOptions: isArk
+                ? {
+                    openai: {
+                        store: true,
+                        previousResponseId: arkConversation.previousResponseId
+                    }
+                }
+                : providerOptions,
             tools: config.searchEnabled
                 ? { web_search: provider.tools.webSearch({}) }
-                : undefined
+                : undefined,
+            usesArkInstructions: isArk
         };
     }
 
-    if (config.provider === PROVIDERS.anthropic) {
+    if (config.provider === 'anthropic') {
         const { createAnthropic } = await import('@ai-sdk/anthropic');
         const provider = createAnthropic({
             apiKey: config.apiKey,
@@ -261,7 +258,7 @@ async function createProviderRuntime(config) {
         };
     }
 
-    if (config.provider === PROVIDERS.gemini) {
+    if (config.provider === 'gemini') {
         const { createGoogle } = await import('@ai-sdk/google');
         const provider = createGoogle({
             apiKey: config.apiKey,
@@ -349,17 +346,25 @@ export async function handleChatApi(request, response, next) {
 
         const config = normalizeConfig(body.config);
         const abortSignal = createDisconnectSignal(request, response);
-        const runtime = await createProviderRuntime(config);
-        const messages = await convertToModelMessages(body.messages, {
-            tools: runtime.tools,
-            ignoreIncompleteToolCalls: true
-        });
+        const arkConversation = config.provider === 'ark_responses'
+            ? prepareArkConversation(body.messages, config)
+            : null;
+        const runtime = await createProviderRuntime(config, arkConversation);
+        const messages = await convertToModelMessages(
+            arkConversation?.messages || body.messages,
+            {
+                tools: runtime.tools,
+                ignoreIncompleteToolCalls: true
+            }
+        );
         if (abortSignal.aborted) return true;
 
         const result = streamText({
             model: runtime.model,
             messages,
-            system: config.systemPrompt || undefined,
+            system: runtime.usesArkInstructions
+                ? undefined
+                : config.systemPrompt || undefined,
             tools: runtime.tools,
             providerOptions: runtime.providerOptions,
             maxRetries: MAX_RETRIES,
@@ -376,6 +381,9 @@ export async function handleChatApi(request, response, next) {
             originalMessages: body.messages,
             sendReasoning: true,
             sendSources: true,
+            messageMetadata: ({ part }) => config.provider === 'ark_responses'
+                ? getArkMessageMetadata(part, config)
+                : undefined,
             onError: (error) => getErrorMessage(error)
         });
         pipeUIMessageStreamToResponse({ response, stream: uiStream });

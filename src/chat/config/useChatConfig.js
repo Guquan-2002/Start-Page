@@ -1,18 +1,74 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { CHAT_STORAGE_KEY } from '../constants.js';
-import { normalizeStoredConfig } from './config-normalizer.js';
 import {
     getProviderDefinition,
     getProviderDefinitions,
-    resolveProviderId
+    getProviderDefaults,
+    getProviderIds,
+    resolveProviderId,
+    CHAT_DEFAULTS
 } from '../providers/provider-registry.js';
 import { safeGetJson, safeSetJson } from '../../shared/safe-storage.js';
+import { asTrimmedString } from '../../shared/string-utils.js';
 
 const PROVIDERS = getProviderDefinitions();
+const SUPPORTED_PROVIDER_IDS = getProviderIds();
 
-function normalizeStringDraft(value) {
-    return typeof value === 'string' ? value : '';
+function readBoolean(value, fallback) {
+    return typeof value === 'boolean' ? value : fallback;
+}
+
+function normalizeReasoning(provider, rawValue) {
+    const reasoning = getProviderDefinition(provider)?.reasoning;
+    if (!reasoning) return '';
+    const normalized = asTrimmedString(rawValue).toLowerCase();
+    return reasoning.options.includes(normalized) ? normalized : '';
+}
+
+function normalizeStoredProfile(provider, rawProfile, defaults) {
+    const profile = rawProfile && typeof rawProfile === 'object' ? rawProfile : {};
+    const searchSupported = getProviderDefinition(provider)?.search?.supported !== false;
+    return {
+        apiUrl: asTrimmedString(profile.apiUrl, defaults.apiUrl),
+        apiKey: asTrimmedString(profile.apiKey, defaults.apiKey),
+        model: asTrimmedString(profile.model, defaults.model),
+        searchEnabled: searchSupported
+            && readBoolean(profile.searchEnabled, defaults.searchEnabled === true),
+        reasoning: normalizeReasoning(provider, profile.reasoning)
+    };
+}
+
+const DEFAULT_PROFILES = Object.fromEntries(
+    SUPPORTED_PROVIDER_IDS.map((provider) => {
+        const defaults = getProviderDefaults(provider);
+        return [provider, normalizeStoredProfile(provider, defaults, defaults)];
+    })
+);
+
+function normalizeStoredConfig(raw) {
+    if (!raw || typeof raw !== 'object' || !raw.profiles || typeof raw.profiles !== 'object') {
+        return {
+            provider: CHAT_DEFAULTS.provider,
+            profiles: DEFAULT_PROFILES,
+            systemPrompt: CHAT_DEFAULTS.systemPrompt
+        };
+    }
+
+    const profiles = {};
+    SUPPORTED_PROVIDER_IDS.forEach((provider) => {
+        profiles[provider] = normalizeStoredProfile(
+            provider,
+            raw.profiles[provider],
+            DEFAULT_PROFILES[provider]
+        );
+    });
+
+    return {
+        provider: resolveProviderId(raw.provider, CHAT_DEFAULTS.provider),
+        profiles,
+        systemPrompt: asTrimmedString(raw.systemPrompt, CHAT_DEFAULTS.systemPrompt)
+    };
 }
 
 function isProfileField(field) {
@@ -35,26 +91,7 @@ function buildPresentation(providerId) {
     };
 }
 
-function buildRequestConfig(sourceConfig) {
-    const normalized = normalizeStoredConfig(sourceConfig);
-    const provider = normalized.provider;
-    const activeProfile = normalized.profiles[provider];
-
-    return {
-        provider,
-        apiUrl: activeProfile.apiUrl,
-        apiKey: activeProfile.apiKey,
-        model: activeProfile.model,
-        reasoning: activeProfile.reasoning,
-        searchEnabled: activeProfile.searchEnabled,
-        systemPrompt: normalizeStringDraft(sourceConfig.systemPrompt)
-    };
-}
-
-export function useChatConfig({
-    storage,
-    storageKey = CHAT_STORAGE_KEY
-} = {}) {
+export function useChatConfig({ storage, storageKey = CHAT_STORAGE_KEY } = {}) {
     const [storageTarget] = useState(() => {
         if (storage !== undefined) return storage;
         try { return globalThis.localStorage; } catch { return null; }
@@ -65,30 +102,26 @@ export function useChatConfig({
     ));
 
     const setProvider = useCallback((providerId) => {
-        setConfig((currentConfig) => {
-            const nextProvider = resolveProviderId(providerId, currentConfig.provider);
-            if (nextProvider === currentConfig.provider) {
-                return currentConfig;
-            }
-            return { ...currentConfig, provider: nextProvider };
+        setConfig((current) => {
+            const nextProvider = resolveProviderId(providerId, current.provider);
+            if (nextProvider === current.provider) return current;
+            return { ...current, provider: nextProvider };
         });
     }, []);
 
     const updateProfile = useCallback((field, value) => {
         if (!isProfileField(field)) return;
-        setConfig((currentConfig) => {
-            const providerId = currentConfig.provider;
-            const currentProfile = currentConfig.profiles[providerId];
+        setConfig((current) => {
+            const providerId = current.provider;
+            const currentProfile = current.profiles[providerId];
             const normalizedValue = field === 'searchEnabled'
                 ? value === true
-                : normalizeStringDraft(value);
-            if (Object.is(currentProfile[field], normalizedValue)) {
-                return currentConfig;
-            }
+                : asTrimmedString(value);
+            if (Object.is(currentProfile[field], normalizedValue)) return current;
             return {
-                ...currentConfig,
+                ...current,
                 profiles: {
-                    ...currentConfig.profiles,
+                    ...current.profiles,
                     [providerId]: { ...currentProfile, [field]: normalizedValue }
                 }
             };
@@ -97,23 +130,33 @@ export function useChatConfig({
 
     const updateCommon = useCallback((field, value) => {
         if (field !== 'systemPrompt') return;
-        setConfig((currentConfig) => {
-            const normalizedValue = normalizeStringDraft(value);
-            if (Object.is(currentConfig.systemPrompt, normalizedValue)) {
-                return currentConfig;
-            }
-            return { ...currentConfig, systemPrompt: normalizedValue };
+        setConfig((current) => {
+            const normalizedValue = asTrimmedString(value);
+            if (Object.is(current.systemPrompt, normalizedValue)) return current;
+            return { ...current, systemPrompt: normalizedValue };
         });
     }, []);
 
     const saveConfig = useCallback(() => {
-        const storedConfig = normalizeStoredConfig(config);
-        return safeSetJson(resolvedStorageKey, storedConfig, storageTarget);
+        return safeSetJson(resolvedStorageKey, config, storageTarget);
     }, [config, resolvedStorageKey, storageTarget]);
 
-    const requestConfig = useMemo(() => buildRequestConfig(config), [config]);
-
     const activeProfile = config.profiles[config.provider];
+
+    const requestConfig = useMemo(() => {
+        const provider = resolveProviderId(config.provider, CHAT_DEFAULTS.provider);
+        const profile = config.profiles[provider] || {};
+        return {
+            provider,
+            apiUrl: profile.apiUrl || '',
+            apiKey: profile.apiKey || '',
+            model: profile.model || '',
+            reasoning: profile.reasoning || '',
+            searchEnabled: profile.searchEnabled === true,
+            systemPrompt: asTrimmedString(config.systemPrompt)
+        };
+    }, [config]);
+
     const presentation = useMemo(
         () => buildPresentation(config.provider),
         [config.provider]

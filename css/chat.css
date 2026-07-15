@@ -445,14 +445,14 @@
     animation-delay: 0ms, 250ms;
 }
 
-.chat-user-images {
+.chat-message-attachments {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
     margin-top: 8px;
 }
 
-.chat-user-image {
+.chat-message-attachment-img {
     width: 112px;
     height: 112px;
     object-fit: cover;

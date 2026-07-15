@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
 
-const NOOP = () => {};
 const FOCUSABLE_SELECTOR = [
     'button:not([disabled])',
     'input:not([disabled])',
@@ -14,8 +13,7 @@ const FOCUSABLE_SELECTOR = [
 export function ChatSettings({
     chatConfig,
     isOpen = false,
-    onClose = NOOP,
-    onSaved = NOOP
+    onClose
 }) {
     const dialogRef = useRef(null);
     const providerSelectRef = useRef(null);
@@ -29,7 +27,7 @@ export function ChatSettings({
         const handleKeyDown = (event) => {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                onClose();
+                onClose?.();
                 return;
             }
 
@@ -73,10 +71,8 @@ export function ChatSettings({
     const placeholders = presentation.placeholders;
 
     const handleSave = () => {
-        if (saveConfig()) {
-            onSaved();
-        }
-        onClose();
+        saveConfig();
+        onClose?.();
     };
 
     return (
