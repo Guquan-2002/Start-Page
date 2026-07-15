@@ -1,71 +1,21 @@
-/* --- 背景特效层 (星空) --- */
-#background-effects {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 2s ease-in-out;
-}
-.night #background-effects { opacity: 1; }
-
-#starfield-canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.stars-bg {
-    position: absolute;
-    inset: 0;
-}
-
-/* 流星 - 使用 box-shadow 替代 filter: drop-shadow (性能更好) */
-.stars-bg::before, .stars-bg::after {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    height: 1px;
-    background: linear-gradient(to right, transparent, white, transparent);
-    border-radius: 999px;
-    transform-origin: left top;
-    opacity: 0;
-    will-change: transform, opacity;
-}
-
-.stars-bg::before {
-    width: 150px;
-    box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
-    animation: shooting-star 20s ease-out infinite 10s;
-}
-
-.stars-bg::after {
-    width: 120px;
-    background: linear-gradient(to right, transparent, rgba(180, 220, 255, 1), transparent);
-    box-shadow: 0 0 4px rgba(180, 220, 255, 0.6);
-    animation: shooting-star 30s ease-in-out infinite 15s;
-}
-
-/* --- 布局与组件 --- */
 .container {
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    padding: 20px;
+    height: 100dvh;
+    padding: clamp(12px, 2vw, 20px);
     position: relative;
     z-index: 2;
 }
 
 #time-container {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: clamp(1.5rem, 2vw, 2rem);
 }
 
 #time {
-    font-size: 7rem;
+    font-size: clamp(6rem, 7vw, 8rem);
     font-weight: 600;
     letter-spacing: 2px;
     text-shadow:
@@ -76,26 +26,26 @@
 }
 
 #date {
-    font-size: 1.5rem;
+    font-size: clamp(1.4rem, 1.5vw, 1.8rem);
     font-weight: 300;
 }
 
 #weather-container {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: clamp(10px, 1vw, 12px);
     color: var(--text-color);
     text-decoration: none;
-    font-size: 1.8rem;
+    font-size: clamp(1.6rem, 1.5vw, 2rem);
     font-weight: 400;
-    padding: 10px 20px;
+    padding: clamp(8px, 1vw, 12px) clamp(16px, 1.5vw, 24px);
     background-color: var(--component-bg);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 20px;
-    -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
-    margin-bottom: 2.5rem;
-    transition: all 0.3s ease;
+    margin-bottom: clamp(2rem, 2.5vw, 2.5rem);
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+        transform 0.3s ease, box-shadow 0.3s ease;
     cursor: pointer;
 }
 
@@ -127,24 +77,25 @@
 
 .search-icon {
     position: absolute;
-    left: 20px;
+    left: clamp(14px, 1.5vw, 22px);
     color: var(--placeholder-color);
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 1.2vw, 1.3rem);
     transition: color 0.3s ease;
     pointer-events: none;
 }
 
 #search-input {
     width: 100%;
-    padding: 18px 20px 18px 50px;
+    padding: clamp(14px, 1.5vw, 20px) clamp(16px, 2vw, 24px)
+        clamp(14px, 1.5vw, 20px) clamp(42px, 4vw, 55px);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 30px;
     background-color: var(--component-bg);
     color: var(--text-color);
-    font-size: 1.2rem;
-    -webkit-backdrop-filter: blur(10px);
+    font-size: clamp(1.2rem, 1.2vw, 1.3rem);
     backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+        box-shadow 0.3s ease;
 }
 
 #search-input::placeholder {
@@ -169,17 +120,16 @@
 
 #network-status {
     position: fixed;
-    bottom: 15px;
-    right: 20px;
+    bottom: clamp(12px, 1.5vw, 15px);
+    right: clamp(15px, 2vw, 20px);
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.9rem;
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
     background-color: rgba(0, 0, 0, 0.2);
-    padding: 5px 10px;
+    padding: clamp(5px, 0.8vw, 6px) clamp(8px, 1vw, 10px);
     border-radius: 10px;
     z-index: 10;
-    -webkit-backdrop-filter: blur(5px);
     backdrop-filter: blur(5px);
 }
 
@@ -195,12 +145,10 @@
 #network-indicator.bing-ok { background-color: var(--net-ok-local); }
 #network-indicator.net-fail { background-color: var(--net-fail); }
 
-/* --- 响应式设计 --- */
 @media (max-width: 768px) {
     .container {
-        padding: 15px;
         justify-content: flex-start;
-        padding-top: 15vh;
+        padding-top: clamp(12vh, 15vw, 15vh);
     }
 
     #time-container {
@@ -208,43 +156,22 @@
     }
 
     #time {
-        font-size: 4.5rem;
+        font-size: clamp(3rem, 14vw, 4.5rem);
         letter-spacing: 1px;
     }
 
     #date {
-        font-size: 1.1rem;
+        font-size: clamp(0.9rem, 4vw, 1.1rem);
         margin-top: 0.5rem;
     }
 
     #weather-container {
-        font-size: 1.2rem;
-        padding: 8px 16px;
-        margin-bottom: 2rem;
-        gap: 10px;
+        font-size: clamp(1rem, 4.5vw, 1.2rem);
     }
 
     #search-container {
         max-width: 100%;
         padding: 0 10px;
-    }
-
-    #search-input {
-        padding: 16px 18px 16px 45px;
-        font-size: 1rem;
-        border-radius: 25px;
-    }
-
-    .search-icon {
-        left: 16px;
-        font-size: 1.1rem;
-    }
-
-    #network-status {
-        bottom: 12px;
-        right: 15px;
-        font-size: 0.85rem;
-        padding: 6px 10px;
     }
 
     #network-indicator {
@@ -253,54 +180,17 @@
     }
 }
 
-/* 小屏幕手机优化 */
-@media (max-width: 375px) {
-    .container {
-        padding: 12px;
-        padding-top: 12vh;
-    }
-
-    #time {
-        font-size: 3.5rem;
-    }
-
-    #date {
-        font-size: 1rem;
-    }
-
-    #weather-container {
-        font-size: 1.1rem;
-        padding: 7px 14px;
-    }
-
-    #search-input {
-        padding: 14px 16px 14px 42px;
-        font-size: 0.95rem;
-    }
-
-    .search-icon {
-        left: 14px;
-        font-size: 1rem;
-    }
-
-    #network-status {
-        font-size: 0.8rem;
-        padding: 5px 8px;
-    }
-}
-
-/* 横屏模式优化 */
 @media (max-width: 768px) and (orientation: landscape) {
     .container {
         padding-top: 8vh;
     }
 
-    #time-container {
-        margin-bottom: 1rem;
+    #time {
+        font-size: clamp(3rem, 8vw, 3.5rem);
     }
 
-    #time {
-        font-size: 3.5rem;
+    #time-container {
+        margin-bottom: 0.8rem;
     }
 
     #date {
@@ -308,33 +198,7 @@
     }
 
     #weather-container {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1.2rem;
         font-size: 1.1rem;
-    }
-}
-
-/* 超大屏幕优化 */
-@media (min-width: 1920px) {
-    #time {
-        font-size: 8rem;
-    }
-
-    #date {
-        font-size: 1.8rem;
-    }
-
-    #weather-container {
-        font-size: 2rem;
-        padding: 12px 24px;
-    }
-
-    #search-input {
-        font-size: 1.3rem;
-        padding: 20px 24px 20px 55px;
-    }
-
-    .search-icon {
-        font-size: 1.3rem;
-        left: 22px;
     }
 }

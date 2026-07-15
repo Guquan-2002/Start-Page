@@ -1,6 +1,6 @@
 import { useChat as useAiChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 function readFilePart(file) {
     return new Promise((resolve, reject) => {
@@ -8,26 +8,21 @@ function readFilePart(file) {
 
         reader.onload = () => resolve({
             type: 'file',
-            mediaType: file.type || 'application/octet-stream',
-            filename: file.name || undefined,
+            mediaType: file.type,
+            filename: file.name,
             url: String(reader.result)
         });
         reader.onerror = () => reject(
-            new Error(`Failed to read ${file.name || 'attachment'}.`)
+            new Error(`Failed to read ${file.name}.`)
         );
-        reader.onabort = () => {
-            const error = new Error('Attachment reading was cancelled.');
-            error.name = 'AbortError';
-            reject(error);
-        };
 
         reader.readAsDataURL(file);
     });
 }
 
 function getMissingConfig(config) {
-    if (!config?.apiKey?.trim()) return 'API Key is required.';
-    if (!config?.model?.trim()) return 'Model is required.';
+    if (!config.apiKey.trim()) return 'API Key is required.';
+    if (!config.model.trim()) return 'Model is required.';
     return '';
 }
 
@@ -37,15 +32,13 @@ export function useChat({ requestConfig, onRequireSettings }) {
     const [localError, setLocalError] = useState('');
     const inputRef = useRef(null);
     const requestConfigRef = useRef(requestConfig);
-    const transportRef = useRef(null);
     requestConfigRef.current = requestConfig;
-
-    if (!transportRef.current) {
-        transportRef.current = new DefaultChatTransport({
+    const [transport] = useState(() => (
+        new DefaultChatTransport({
             api: '/api/chat',
             body: () => ({ config: requestConfigRef.current })
-        });
-    }
+        })
+    ));
 
     const {
         messages,
@@ -57,21 +50,19 @@ export function useChat({ requestConfig, onRequireSettings }) {
         setMessages,
         clearError
     } = useAiChat({
-        transport: transportRef.current,
-        onFinish: () => inputRef.current?.focus()
+        transport,
+        onFinish: () => inputRef.current.focus()
     });
     const isStreaming = status === 'submitted' || status === 'streaming';
 
-    const sendMessage = useCallback(async () => {
-        if (isStreaming) return;
-
+    const sendMessage = async () => {
         const text = input.trim();
         if (!text && attachments.length === 0) return;
 
         const configError = getMissingConfig(requestConfigRef.current);
         if (configError) {
             setLocalError(configError);
-            onRequireSettings?.();
+            onRequireSettings();
             return;
         }
 
@@ -83,10 +74,10 @@ export function useChat({ requestConfig, onRequireSettings }) {
         await sendAiMessage(text
             ? { text, files: attachments }
             : { files: attachments });
-    }, [attachments, clearError, input, isStreaming, onRequireSettings, sendAiMessage]);
+    };
 
-    const addFiles = useCallback(async (files) => {
-        const images = Array.from(files || []).filter((file) => file?.type?.startsWith('image/'));
+    const addFiles = async (files) => {
+        const images = files.filter((file) => file.type.startsWith('image/'));
         if (images.length === 0) return;
 
         try {
@@ -96,32 +87,28 @@ export function useChat({ requestConfig, onRequireSettings }) {
             setAttachments((current) => [...current, ...parts]);
             setLocalError('');
         } catch (readError) {
-            if (readError?.name !== 'AbortError') {
-                setLocalError(readError?.message || 'Failed to read image file.');
-            }
+            setLocalError(readError.message);
         }
-    }, []);
+    };
 
-    const removeAttachment = useCallback((index) => {
+    const removeAttachment = (index) => {
         setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    }, []);
+    };
 
-    const regenerateMessage = useCallback((messageId) => {
-        if (isStreaming) return;
+    const regenerateMessage = (messageId) => {
         setLocalError('');
         clearError();
-        return regenerate(messageId ? { messageId } : undefined);
-    }, [clearError, isStreaming, regenerate]);
+        return regenerate({ messageId });
+    };
 
-    const clearConversation = useCallback(() => {
-        if (isStreaming) return;
+    const clearConversation = () => {
         setMessages([]);
         setInput('');
         setAttachments([]);
         setLocalError('');
         clearError();
-        inputRef.current?.focus();
-    }, [clearError, isStreaming, setMessages]);
+        inputRef.current.focus();
+    };
 
     useEffect(() => () => { void stop(); }, [stop]);
 

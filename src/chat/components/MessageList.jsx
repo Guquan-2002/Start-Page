@@ -1,9 +1,8 @@
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
-import { MAX_RENDERED_MESSAGES } from '../constants.js';
-import { isImageAttachment } from '../../shared/attachment-utils.js';
 import { MarkdownMessage } from './MarkdownMessage.jsx';
+import './MessageList.css';
 
 function FilePart({ part, index }) {
     if (!part.url) return null;
@@ -12,7 +11,7 @@ function FilePart({ part, index }) {
 
     return (
         <div className="chat-message-attachments">
-            {isImageAttachment(part) ? (
+            {part.mediaType.startsWith('image/') ? (
                 <img
                     className="chat-message-attachment-img"
                     src={part.url}
@@ -60,7 +59,7 @@ function SourcePart({ part }) {
     ) : <span className="chat-source-link">{label}</span>;
 }
 
-function renderPart(part, index, { role, isStreaming }) {
+function renderPart(part, index, role, isStreaming) {
     switch (part.type) {
         case 'text':
             if (!part.text) return null;
@@ -98,7 +97,7 @@ function renderPart(part, index, { role, isStreaming }) {
 }
 
 function hasRenderablePart(message) {
-    return (message.parts || []).some((part) => {
+    return message.parts.some((part) => {
         if (part.type === 'file') return Boolean(part.url);
         if (part.type === 'source-url' || part.type === 'source-document') return true;
         if (part.type === 'text' || part.type === 'reasoning') return Boolean(part.text);
@@ -107,17 +106,14 @@ function hasRenderablePart(message) {
 }
 
 function Message({ message, isStreaming, isPending, onRegenerate }) {
-    const role = message.role === 'assistant' || message.role === 'system'
-        ? message.role
-        : 'user';
-    const parts = message.parts || [];
+    const { role, parts } = message;
 
     if (!hasRenderablePart(message)) return null;
 
     return (
         <div className={`chat-msg ${role}${isStreaming ? ' is-streaming' : ''}`}>
-            {parts.map((part, index) => renderPart(part, index, { role, isStreaming }))}
-            {role === 'assistant' && onRegenerate ? (
+            {parts.map((part, index) => renderPart(part, index, role, isStreaming))}
+            {role === 'assistant' ? (
                 <button
                     type="button"
                     className="msg-regenerate-btn"
@@ -133,31 +129,15 @@ function Message({ message, isStreaming, isPending, onRegenerate }) {
     );
 }
 
-function ErrorMessage({ error }) {
-    const detail = error instanceof Error ? error.message : String(error);
-
-    return (
-        <div className="chat-msg error" role="alert">
-            <div className="chat-error-title">Unable to complete the request</div>
-            {detail ? <div className="chat-error-detail">{detail}</div> : null}
-        </div>
-    );
-}
-
 export function MessageList({
-    messages = [],
-    status = 'ready',
+    messages,
+    status,
     error,
-    onRegenerate,
-    inert = false
+    onRegenerate
 }) {
     const localRef = useRef(null);
-    const visibleMessages = useMemo(
-        () => messages.slice(-MAX_RENDERED_MESSAGES),
-        [messages]
-    );
     const isPending = status === 'submitted' || status === 'streaming';
-    const lastMessage = visibleMessages.at(-1);
+    const lastMessage = messages.at(-1);
     const showPlaceholder = status === 'submitted'
         || (status === 'streaming' && (
             !lastMessage
@@ -167,9 +147,8 @@ export function MessageList({
 
     useLayoutEffect(() => {
         const element = localRef.current;
-        if (!element) return;
         element.scrollTo({ top: element.scrollHeight, behavior: 'auto' });
-    }, [visibleMessages, status, error]);
+    }, [messages, status, error]);
 
     return (
         <div
@@ -179,16 +158,15 @@ export function MessageList({
             aria-live="polite"
             aria-relevant="additions text"
             aria-busy={isPending}
-            inert={inert}
         >
-            {visibleMessages.length === 0 && !isPending && !error ? (
+            {messages.length === 0 && !isPending && !error ? (
                 <div id="chat-empty-state">
                     <Icon name="comments" />
                     <span>Start a conversation</span>
                 </div>
-            ) : visibleMessages.map((message, index) => (
+            ) : messages.map((message) => (
                 <Message
-                    key={message.id || `message-${index}`}
+                    key={message.id}
                     message={message}
                     isPending={isPending}
                     onRegenerate={onRegenerate}
@@ -202,7 +180,12 @@ export function MessageList({
                     Thinking...
                 </div>
             ) : null}
-            {error ? <ErrorMessage error={error} /> : null}
+            {error ? (
+                <div className="chat-msg error" role="alert">
+                    <div className="chat-error-title">Unable to complete the request</div>
+                    <div className="chat-error-detail">{error}</div>
+                </div>
+            ) : null}
         </div>
     );
 }

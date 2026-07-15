@@ -1,4 +1,3 @@
-/* --- CSS 变量与主题定义 --- */
 :root {
     --morning-gradient: linear-gradient(-45deg, hsl(40, 100%, 70%), hsl(20, 70%, 70%), hsl(60, 70%, 70%), hsl(40, 50%, 90%));
     --day-gradient: linear-gradient(-135deg, hsl(200, 100%, 70%), hsl(220, 70%, 70%), hsl(200, 70%, 70%), hsl(200, 70%, 70%));
@@ -15,25 +14,38 @@
     --component-bg-focus: rgba(255, 255, 255, 0.25);
     --component-shadow-focus: 0 0 15px rgba(0, 0, 0, 0.2);
 
+    --chat-panel-bg: rgba(20, 20, 30, 0.85);
+    --chat-overlay-bg-start: rgba(16, 22, 34, 0.97);
+    --chat-overlay-bg-end: rgba(14, 20, 32, 0.95);
+    --chat-border: rgba(255, 255, 255, 0.1);
+    --chat-muted-border: rgba(255, 255, 255, 0.16);
+    --chat-soft-bg: rgba(255, 255, 255, 0.08);
+    --chat-accent: rgba(100, 140, 255, 0.4);
+    --chat-accent-strong: rgba(100, 140, 255, 0.6);
+    --chat-danger: rgba(255, 80, 80, 0.4);
+    --chat-danger-strong: rgba(255, 80, 80, 0.6);
+
     --net-ok-global: #66CCFF;
     --net-ok-local: #00EE00;
     --net-fail: #EE0000;
     --net-checking: #EEEE00;
 }
 
-/* --- 主题类 --- */
 .morning {
     --current-theme-gradient: var(--morning-gradient);
     --glow-intensity: 0.25;
 }
+
 .day {
     --current-theme-gradient: var(--day-gradient);
     --glow-intensity: 0.15;
 }
+
 .evening {
     --current-theme-gradient: var(--evening-gradient);
     --glow-intensity: 0.20;
 }
+
 .night {
     --current-theme-gradient: var(--night-gradient);
     --glow-intensity: 0.10;

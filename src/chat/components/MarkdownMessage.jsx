@@ -1,5 +1,6 @@
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
+import './MarkdownMessage.css';
 
 function SimpleCode({ node, className, children, ...props }) {
     // Block-level code (fenced code blocks) — render simple <pre><code>
@@ -19,10 +20,9 @@ function SimpleCode({ node, className, children, ...props }) {
     );
 }
 
-export function MarkdownMessage({ className, text = '', isStreaming = false }) {
+export function MarkdownMessage({ text, isStreaming }) {
     return (
         <Streamdown
-            className={className}
             mode={isStreaming ? 'streaming' : 'static'}
             isAnimating={isStreaming}
             components={{ code: SimpleCode }}

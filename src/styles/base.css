@@ -1,8 +1,18 @@
-/* --- 基础与全局样式 --- */
 *, *::before, *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+@keyframes gradient-flow {
+    to { background-position: 100% 100%; }
+}
+
+@keyframes glow-drift {
+    25% { transform: translate(5%, -2%) scale(1.0); }
+    50% { transform: translate(0%, 5%) scale(1.05); }
+    75% { transform: translate(-5%, 0%) scale(0.95); }
+    100% { transform: translate(5%, 5%) scale(1.0); }
 }
 
 body {
@@ -14,7 +24,6 @@ body {
     background-size: 400% 400%;
     transition: background 2s ease-in-out;
     animation: gradient-flow 8s ease-in-out infinite alternate;
-    /* 移动端优化 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -33,21 +42,6 @@ body {
     border: 0;
 }
 
-.icon {
-    display: inline-block;
-    width: 1em;
-    height: 1em;
-    vertical-align: -0.125em;
-}
-
-.icon-spin {
-    animation: icon-spin 1s linear infinite;
-}
-
-@keyframes icon-spin {
-    to { transform: rotate(360deg); }
-}
-
 body::before {
     content: '';
     position: fixed;
@@ -63,11 +57,44 @@ body::before {
     will-change: transform;
 }
 
-/* 移动端滚动优化 */
 @media (max-width: 768px) {
     body {
         overflow-x: hidden;
         overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        animation-duration: 12s;
+    }
+
+    body::before {
+        animation: none;
+        opacity: 0.5;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    textarea,
+    select {
+        font-size: 16px !important;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    * {
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    }
+
+    button:active {
+        opacity: 0.8;
+    }
+
+    a:active {
+        opacity: 0.7;
+    }
+}
+
+@media (hover: none) {
+    button,
+    a,
+    input[type="checkbox"] {
+        min-height: 44px;
     }
 }

@@ -1,60 +1,24 @@
 import { useEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
-
-const FOCUSABLE_SELECTOR = [
-    'button:not([disabled])',
-    'input:not([disabled])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])'
-].join(',');
+import './ChatSettings.css';
 
 export function ChatSettings({
     chatConfig,
-    isOpen = false,
+    isOpen,
     onClose
 }) {
     const dialogRef = useRef(null);
-    const providerSelectRef = useRef(null);
 
     useEffect(() => {
-        if (!isOpen) {
-            return undefined;
+        const dialog = dialogRef.current;
+
+        if (isOpen && !dialog.open) {
+            dialog.showModal();
+        } else if (!isOpen && dialog.open) {
+            dialog.close();
         }
-
-        providerSelectRef.current?.focus();
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                onClose?.();
-                return;
-            }
-
-            if (event.key !== 'Tab') return;
-            const focusable = Array.from(
-                dialogRef.current?.querySelectorAll(FOCUSABLE_SELECTOR) || []
-            );
-            if (focusable.length === 0) return;
-
-            const first = focusable[0];
-            const last = focusable.at(-1);
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
-            }
-        };
-
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
-
-    if (!chatConfig) {
-        throw new TypeError('ChatSettings requires the value returned by useChatConfig().');
-    }
+    }, [isOpen]);
 
     const {
         config,
@@ -63,28 +27,23 @@ export function ChatSettings({
         presentation,
         setProvider,
         updateProfile,
-        updateCommon,
-        saveConfig
+        setSystemPrompt
     } = chatConfig;
     const reasoning = presentation.reasoning;
     const search = presentation.search;
     const placeholders = presentation.placeholders;
 
-    const handleSave = () => {
-        saveConfig();
-        onClose?.();
+    const handleCancel = (event) => {
+        event.preventDefault();
+        onClose();
     };
 
     return (
-        <div
+        <dialog
             id="chat-settings"
             ref={dialogRef}
-            className={isOpen ? undefined : 'chat-settings-hidden'}
-            role="dialog"
             aria-labelledby="chat-settings-title"
-            aria-modal="true"
-            aria-hidden={!isOpen}
-            inert={!isOpen}
+            onCancel={handleCancel}
         >
             <div className="chat-settings-overlay">
                 <div className="chat-settings-header">
@@ -110,7 +69,7 @@ export function ChatSettings({
                         Provider
                         <select
                             id="cfg-provider"
-                            ref={providerSelectRef}
+                            autoFocus
                             value={config.provider}
                             onChange={(event) => setProvider(event.target.value)}
                         >
@@ -165,7 +124,7 @@ export function ChatSettings({
                             rows={3}
                             value={config.systemPrompt}
                             placeholder="You are a helpful assistant."
-                            onChange={(event) => updateCommon('systemPrompt', event.target.value)}
+                            onChange={(event) => setSystemPrompt(event.target.value)}
                         />
                     </label>
 
@@ -206,13 +165,7 @@ export function ChatSettings({
                     </div>
 
                 </div>
-
-                <div className="chat-settings-footer">
-                    <button id="cfg-save-btn" type="button" onClick={handleSave}>
-                        Save Settings
-                    </button>
-                </div>
             </div>
-        </div>
+        </dialog>
     );
 }

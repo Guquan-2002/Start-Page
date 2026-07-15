@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { CONFIG } from '../config.js';
+const TIME_UPDATE_INTERVAL = 1000;
 
 function formatClock(now) {
     return {
@@ -13,16 +13,16 @@ function formatClock(now) {
     };
 }
 
-export function useClock(interval = CONFIG.TIME_UPDATE_INTERVAL) {
+export function useClock() {
     const [now, setNow] = useState(() => new Date());
 
     useEffect(() => {
         const timerId = window.setInterval(() => {
             setNow(new Date());
-        }, interval);
+        }, TIME_UPDATE_INTERVAL);
 
         return () => window.clearInterval(timerId);
-    }, [interval]);
+    }, []);
 
     return formatClock(now);
 }

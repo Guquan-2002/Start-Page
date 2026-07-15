@@ -1,3 +1,5 @@
+import './Icon.css';
+
 const ICONS = {
     search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></>,
     comments: <><path d="M21 15a4 4 0 0 1-4 4H8l-5 3 1.6-4.8A8 8 0 1 1 21 15Z" /><path d="M8 11h8M8 15h5" /></>,
@@ -19,14 +21,12 @@ const ICONS = {
     fog: <path d="M4 8h16M2 12h15M6 16h16" />,
     temperature: <><path d="M14 14.8V5a4 4 0 0 0-8 0v9.8a6 6 0 1 0 8 0Z" /><path d="M10 9v8" /></>,
     key: <><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M17 6l2 2M14 9l2 2" /></>,
-    question: <><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.7 2.7 0 1 1 4.3 2.2c-1 .7-1.8 1.2-1.8 2.8M12 18h.01" /></>,
     warning: <><path d="M10.3 3.7 2.4 18a2 2 0 0 0 1.75 3h15.7a2 2 0 0 0 1.75-3L13.7 3.7a2 2 0 0 0-3.4 0Z" /><path d="M12 9v4M12 17h.01" /></>,
     spinner: <><circle cx="12" cy="12" r="9" opacity=".25" /><path d="M21 12a9 9 0 0 0-9-9" /></>
 };
 
-export function Icon({ name, className = '', spin = false, ...props }) {
-    const content = ICONS[name] || ICONS.question;
-    const classes = ['icon', spin && 'icon-spin', className].filter(Boolean).join(' ');
+export function Icon({ name, className, spin, ...props }) {
+    const classes = `icon${spin ? ' icon-spin' : ''}${className ? ` ${className}` : ''}`;
 
     return (
         <svg
@@ -41,7 +41,7 @@ export function Icon({ name, className = '', spin = false, ...props }) {
             focusable="false"
             {...props}
         >
-            {content}
+            {ICONS[name]}
         </svg>
     );
 }

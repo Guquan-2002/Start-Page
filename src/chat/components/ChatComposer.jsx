@@ -1,71 +1,56 @@
-import { useCallback, useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
-import { isImageAttachment } from '../../shared/attachment-utils.js';
+import './ChatComposer.css';
 
 export function ChatComposer({
-    input = '',
+    input,
     setInput,
-    attachments = [],
+    attachments,
     onAddFiles,
     onRemoveAttachment,
     onSend,
     onStop,
-    isStreaming = false,
-    inputRef,
-    inert = false
+    isStreaming,
+    inputRef
 }) {
     const fileInputRef = useRef(null);
 
     useLayoutEffect(() => {
-        const textarea = inputRef?.current;
-        if (!textarea) return;
+        const textarea = inputRef.current;
         textarea.style.height = 'auto';
         textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
     }, [input, inputRef]);
 
-    const handleFileChange = useCallback((event) => {
-        onAddFiles?.(Array.from(event.target.files));
+    const handleFileChange = (event) => {
+        onAddFiles(Array.from(event.target.files));
         event.target.value = '';
-    }, [onAddFiles]);
+    };
 
-    const handlePaste = useCallback((event) => {
-        const clipboardItems = Array.from(event.clipboardData?.items || []);
-        const pastedImages = clipboardItems
-            .filter((item) => item.type?.startsWith('image/'))
-            .map((item) => item.getAsFile())
-            .filter(Boolean);
-        const imageFiles = pastedImages.length > 0
-            ? pastedImages
-            : Array.from(event.clipboardData?.files || []);
+    const handlePaste = (event) => {
+        const pastedImages = Array.from(event.clipboardData.items)
+            .filter((item) => item.type.startsWith('image/'))
+            .map((item) => item.getAsFile());
 
-        if (imageFiles.length === 0) return;
+        if (pastedImages.length === 0) return;
         event.preventDefault();
-        onAddFiles?.(imageFiles);
-    }, [onAddFiles]);
+        onAddFiles(pastedImages);
+    };
 
-    const handleSend = useCallback(() => {
-        if (!isStreaming && typeof onSend === 'function') {
-            onSend();
-        }
-    }, [isStreaming, onSend]);
-
-    const handleKeyDown = useCallback((event) => {
-        if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) {
+    const handleKeyDown = (event) => {
+        if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
         event.preventDefault();
-        handleSend();
-    }, [handleSend]);
+        onSend();
+    };
 
     const attachmentTitle = attachments.length === 0
-        ? 'Attach images'
-        : attachments.length === 1
-            ? '已上传 1 张图片'
-            : `已上传 ${attachments.length} 张图片`;
+        ? '点击此处上传图片'
+        : `已上传 ${attachments.length} 张图片`;
 
     return (
-        <div id="chat-input-area" inert={inert}>
+        <div id="chat-input-area">
             <input
                 ref={fileInputRef}
                 type="file"
@@ -83,32 +68,28 @@ export function ChatComposer({
                 title={attachmentTitle}
                 aria-label={attachmentTitle}
                 disabled={isStreaming}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => fileInputRef.current.click()}
             >
                 <Icon name="image" />
             </button>
             <div id="chat-input-stack">
                 <div id="chat-attachments">
                     {attachments.map((attachment, index) => {
-                        const label = attachment.filename || `attachment-${index + 1}`;
+                        const label = attachment.filename;
                         return (
                             <div
                                 key={`${attachment.url.slice(0, 48)}-${label}-${index}`}
                                 className="chat-attachment-chip"
-                                title={attachment.filename || attachment.mediaType}
+                                title={attachment.filename}
                             >
-                                {isImageAttachment(attachment) ? (
-                                    <img src={attachment.url} alt={label} />
-                                ) : (
-                                    <span className="chat-attachment-filename">{label}</span>
-                                )}
+                                <img src={attachment.url} alt={label} />
                                 <button
                                     type="button"
                                     className="chat-attachment-remove"
                                     title="Remove image"
                                     aria-label={`Remove image ${index + 1}`}
                                     disabled={isStreaming}
-                                    onClick={() => onRemoveAttachment?.(index, attachment)}
+                                    onClick={() => onRemoveAttachment(index)}
                                 >
                                     ×
                                 </button>
@@ -123,7 +104,7 @@ export function ChatComposer({
                     rows={1}
                     value={input}
                     disabled={isStreaming}
-                    onChange={(event) => setInput?.(event.target.value)}
+                    onChange={(event) => setInput(event.target.value)}
                     onPaste={handlePaste}
                     onKeyDown={handleKeyDown}
                 />
@@ -134,7 +115,7 @@ export function ChatComposer({
                     id="chat-stop-btn"
                     title="Stop generation"
                     aria-label="Stop generation"
-                    onClick={() => onStop?.()}
+                    onClick={onStop}
                 >
                     <Icon name="stop" />
                 </button>
@@ -145,7 +126,7 @@ export function ChatComposer({
                     className={input.trim().length > 0 ? 'has-text' : undefined}
                     title="Send"
                     aria-label="Send"
-                    onClick={handleSend}
+                    onClick={onSend}
                 >
                     <Icon name="send" />
                 </button>

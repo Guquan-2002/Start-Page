@@ -1,0 +1,67 @@
+#background-effects {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+}
+
+@keyframes shooting-star {
+    0% { transform: translate(150vw, -100vh) rotate(-45deg); opacity: 0; }
+    5% { opacity: 0; }
+    7% { opacity: 1; }
+    70% { opacity: 1; }
+    80% { opacity: 0.5; }
+    100% { transform: translate(-100px, 100vh) rotate(-45deg); opacity: 0; }
+}
+
+.night #background-effects {
+    opacity: 1;
+}
+
+#starfield-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.stars-bg {
+    position: absolute;
+    inset: 0;
+}
+
+.stars-bg::before,
+.stars-bg::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, white, transparent);
+    border-radius: 999px;
+    transform-origin: left top;
+    opacity: 0;
+    will-change: transform, opacity;
+}
+
+.stars-bg::before {
+    width: 150px;
+    box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+    animation: shooting-star 20s ease-out infinite 10s;
+}
+
+.stars-bg::after {
+    width: 120px;
+    background: linear-gradient(to right, transparent, rgba(180, 220, 255, 1), transparent);
+    box-shadow: 0 0 4px rgba(180, 220, 255, 0.6);
+    animation: shooting-star 30s ease-in-out infinite 15s;
+}
+
+@media (max-width: 768px) {
+    .stars-bg::before,
+    .stars-bg::after {
+        display: none;
+    }
+}

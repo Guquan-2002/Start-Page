@@ -5,25 +5,20 @@ import {
     toUIMessageStream
 } from 'ai';
 
-import { getProviderDefinition, getProviderIds } from '../chat/providers/provider-registry.js';
-import { asTrimmedString } from '../shared/string-utils.js';
+import { getProviderDefinition } from '../shared/chat-provider-registry.js';
 import {
-    createArkFetch,
     getArkMessageMetadata,
     normalizeArkBaseUrl,
     prepareArkConversation
 } from './ark-responses.js';
+import { createProviderRuntime } from './provider-runtime.js';
 
 const CHAT_API_PATH = '/api/chat';
 const MAX_REQUEST_BYTES = 32 * 1024 * 1024;
-const MAX_RETRIES = 3;
 const REQUEST_TIMEOUT = {
     stepMs: 5 * 60 * 1000,
     chunkMs: 30 * 1000
 };
-
-const SUPPORTED_PROVIDERS = new Set(getProviderIds());
-const DISABLED_REASONING_VALUES = new Set(['disabled', 'off', 'none']);
 
 class ChatApiError extends Error {
     constructor(statusCode, message) {
@@ -34,11 +29,7 @@ class ChatApiError extends Error {
 }
 
 function getRequestPath(request) {
-    try {
-        return new URL(request.url || '/', 'http://localhost').pathname;
-    } catch {
-        return '';
-    }
+    return new URL(request.url, 'http://localhost').pathname;
 }
 
 function sendError(response, statusCode, message, headers = {}) {
@@ -62,12 +53,11 @@ async function readJsonBody(request) {
     let size = 0;
 
     for await (const chunk of request) {
-        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        size += buffer.byteLength;
+        size += chunk.byteLength;
         if (size > MAX_REQUEST_BYTES) {
             throw new ChatApiError(413, 'Request body is too large.');
         }
-        chunks.push(buffer);
+        chunks.push(chunk);
     }
 
     if (chunks.length === 0) {
@@ -82,7 +72,7 @@ async function readJsonBody(request) {
 }
 
 function normalizeBaseUrl(rawApiUrl) {
-    const baseURL = asTrimmedString(rawApiUrl).replace(/\/+$/, '');
+    const baseURL = (rawApiUrl || '').trim().replace(/\/+$/, '');
     if (!baseURL) {
         throw new ChatApiError(400, 'API URL is required.');
     }
@@ -106,24 +96,20 @@ function normalizeConfig(rawConfig) {
         throw new ChatApiError(400, 'Chat config is required.');
     }
 
-    const provider = asTrimmedString(rawConfig.provider).toLowerCase();
-    if (!SUPPORTED_PROVIDERS.has(provider)) {
+    const provider = (rawConfig.provider || '').trim().toLowerCase();
+    const definition = getProviderDefinition(provider);
+    if (!definition) {
         throw new ChatApiError(400, `Unsupported provider "${provider || '(empty)'}".`);
     }
-    const definition = getProviderDefinition(provider);
 
-    const apiKey = asTrimmedString(rawConfig.apiKey);
-    const model = asTrimmedString(rawConfig.model);
+    const apiKey = (rawConfig.apiKey || '').trim();
+    const model = (rawConfig.model || '').trim();
     if (!apiKey) throw new ChatApiError(400, 'API Key is required.');
     if (!model) throw new ChatApiError(400, 'Model is required.');
     const normalizedApiUrl = normalizeBaseUrl(rawConfig.apiUrl);
 
-    const reasoning = asTrimmedString(rawConfig.reasoning).toLowerCase();
-    if (
-        reasoning
-        && !DISABLED_REASONING_VALUES.has(reasoning)
-        && !definition.reasoning.options.includes(reasoning)
-    ) {
+    const reasoning = (rawConfig.reasoning || '').trim().toLowerCase();
+    if (reasoning && !definition.reasoning.options.includes(reasoning)) {
         throw new ChatApiError(400, `Unsupported reasoning value "${reasoning}" for ${provider}.`);
     }
 
@@ -137,151 +123,7 @@ function normalizeConfig(rawConfig) {
         reasoning,
         searchEnabled: rawConfig.searchEnabled === true
             && definition.search.supported !== false,
-        systemPrompt: asTrimmedString(rawConfig.systemPrompt)
-    };
-}
-
-function isReasoningDisabled(reasoning) {
-    return DISABLED_REASONING_VALUES.has(reasoning);
-}
-
-function buildProviderOptions(config) {
-    const { provider, reasoning } = config;
-    if (!reasoning) return undefined;
-
-    if (provider === 'openai' || provider === 'openai_responses') {
-        return {
-            openai: {
-                reasoningEffort: isReasoningDisabled(reasoning) ? 'none' : reasoning
-            }
-        };
-    }
-
-    if (provider === 'deepseek') {
-        if (isReasoningDisabled(reasoning)) {
-            return { deepseek: { thinking: { type: 'disabled' } } };
-        }
-        return {
-            deepseek: {
-                thinking: { type: 'enabled' },
-                reasoningEffort: reasoning
-            }
-        };
-    }
-
-    if (provider === 'anthropic') {
-        if (isReasoningDisabled(reasoning)) {
-            return { anthropic: { thinking: { type: 'disabled' } } };
-        }
-        return {
-            anthropic: {
-                thinking: { type: 'adaptive', display: 'summarized' },
-                effort: reasoning
-            }
-        };
-    }
-
-    if (provider === 'gemini') {
-        if (isReasoningDisabled(reasoning)) {
-            return {
-                google: {
-                    thinkingConfig: { thinkingBudget: 0, includeThoughts: false }
-                }
-            };
-        }
-        return {
-            google: {
-                thinkingConfig: { thinkingLevel: reasoning, includeThoughts: true }
-            }
-        };
-    }
-
-    return undefined;
-}
-
-async function createProviderRuntime(config, arkConversation) {
-    const providerOptions = buildProviderOptions(config);
-
-    if (
-        config.provider === 'openai'
-        || config.provider === 'openai_responses'
-        || config.provider === 'ark_responses'
-    ) {
-        const { createOpenAI } = await import('@ai-sdk/openai');
-        const isArk = config.provider === 'ark_responses';
-        const provider = createOpenAI({
-            apiKey: config.apiKey,
-            baseURL: config.apiUrl,
-            name: isArk ? 'ark' : 'openai',
-            fetch: isArk
-                ? createArkFetch({ config, fallbackInput: arkConversation.fallbackInput })
-                : undefined
-        });
-
-        if (config.provider === 'openai') {
-            return {
-                model: provider.chat(config.model),
-                providerOptions,
-                tools: undefined
-            };
-        }
-
-        return {
-            model: provider.responses(config.model),
-            providerOptions: isArk
-                ? {
-                    openai: {
-                        store: true,
-                        previousResponseId: arkConversation.previousResponseId
-                    }
-                }
-                : providerOptions,
-            tools: config.searchEnabled
-                ? { web_search: provider.tools.webSearch({}) }
-                : undefined,
-            usesArkInstructions: isArk
-        };
-    }
-
-    if (config.provider === 'anthropic') {
-        const { createAnthropic } = await import('@ai-sdk/anthropic');
-        const provider = createAnthropic({
-            apiKey: config.apiKey,
-            baseURL: config.apiUrl
-        });
-        return {
-            model: provider(config.model),
-            providerOptions,
-            tools: config.searchEnabled
-                ? { web_search: provider.tools.webSearch_20250305({}) }
-                : undefined
-        };
-    }
-
-    if (config.provider === 'gemini') {
-        const { createGoogle } = await import('@ai-sdk/google');
-        const provider = createGoogle({
-            apiKey: config.apiKey,
-            baseURL: config.apiUrl
-        });
-        return {
-            model: provider(config.model),
-            providerOptions,
-            tools: config.searchEnabled
-                ? { google_search: provider.tools.googleSearch({}) }
-                : undefined
-        };
-    }
-
-    const { createDeepSeek } = await import('@ai-sdk/deepseek');
-    const provider = createDeepSeek({
-        apiKey: config.apiKey,
-        baseURL: config.apiUrl
-    });
-    return {
-        model: provider(config.model),
-        providerOptions,
-        tools: undefined
+        systemPrompt: (rawConfig.systemPrompt || '').trim()
     };
 }
 
@@ -314,16 +156,6 @@ function createDisconnectSignal(request, response) {
     return controller.signal;
 }
 
-function getErrorMessage(error) {
-    return error instanceof Error && error.message
-        ? error.message
-        : 'Chat request failed.';
-}
-
-/**
- * Shared Node/Connect handler for POST /api/chat.
- * Returns true when the request belongs to this API, otherwise calls next.
- */
 export async function handleChatApi(request, response, next) {
     if (getRequestPath(request) !== CHAT_API_PATH) {
         next?.();
@@ -353,8 +185,7 @@ export async function handleChatApi(request, response, next) {
         const messages = await convertToModelMessages(
             arkConversation?.messages || body.messages,
             {
-                tools: runtime.tools,
-                ignoreIncompleteToolCalls: true
+                tools: runtime.tools
             }
         );
         if (abortSignal.aborted) return true;
@@ -367,11 +198,10 @@ export async function handleChatApi(request, response, next) {
                 : config.systemPrompt || undefined,
             tools: runtime.tools,
             providerOptions: runtime.providerOptions,
-            maxRetries: MAX_RETRIES,
             timeout: REQUEST_TIMEOUT,
             abortSignal,
             onError: ({ error }) => {
-                console.error('[chat-api]', getErrorMessage(error));
+                console.error('[chat-api]', error.message);
             }
         });
 
@@ -384,12 +214,12 @@ export async function handleChatApi(request, response, next) {
             messageMetadata: ({ part }) => config.provider === 'ark_responses'
                 ? getArkMessageMetadata(part, config)
                 : undefined,
-            onError: (error) => getErrorMessage(error)
+            onError: (error) => error.message
         });
         pipeUIMessageStreamToResponse({ response, stream: uiStream });
     } catch (error) {
         const statusCode = error instanceof ChatApiError ? error.statusCode : 500;
-        const message = getErrorMessage(error);
+        const { message } = error;
         if (statusCode >= 500) {
             console.error('[chat-api]', message);
         }

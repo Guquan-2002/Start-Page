@@ -1,31 +1,48 @@
 import { BackgroundEffects } from './BackgroundEffects.jsx';
 import { Icon } from '../shared/Icon.jsx';
 import { useClock } from './hooks/useClock.js';
-import { useStartPageServices } from './hooks/useStartPageServices.js';
+import { useNetworkStatus } from './hooks/useNetworkStatus.js';
 import { useTimeTheme } from './hooks/useTimeTheme.js';
+import { useWeather } from './hooks/useWeather.js';
+import './StartPage.css';
 
-export function NetworkStatus({ statusClass, statusText }) {
-    return (
-        <div id="network-status" aria-live="polite" aria-label="Network status">
-            <span id="network-indicator" className={statusClass} />
-            <span id="network-text">{statusText}</span>
-        </div>
-    );
-}
+const SEARCH_CONFIGS = {
+    checking: {
+        action: '#',
+        placeholder: '使用 Google 搜索',
+        statusClass: '',
+        statusText: 'Checking network...'
+    },
+    google: {
+        action: 'https://www.google.com/search',
+        placeholder: '使用 Google 搜索',
+        statusClass: 'google-ok',
+        statusText: '国际'
+    },
+    bing: {
+        action: 'https://cn.bing.com/search',
+        placeholder: '使用 Bing 搜索',
+        statusClass: 'bing-ok',
+        statusText: '国内'
+    },
+    offline: {
+        action: '#',
+        placeholder: '网络连接不可用',
+        statusClass: 'net-fail',
+        statusText: '断开'
+    }
+};
 
 export function StartPage() {
     const clock = useClock();
-    const {
-        isOffline,
-        searchConfig,
-        weather
-    } = useStartPageServices();
-
-    useTimeTheme();
+    const { isGoogleAvailable, networkEngine } = useNetworkStatus();
+    const theme = useTimeTheme();
+    const weather = useWeather(isGoogleAvailable);
+    const searchConfig = SEARCH_CONFIGS[networkEngine ?? 'checking'];
 
     return (
         <>
-            <BackgroundEffects />
+            <BackgroundEffects active={theme === 'night'} />
 
             <main className="container">
                 <div id="time-container" role="timer" aria-label="Current time">
@@ -68,7 +85,7 @@ export function StartPage() {
                             placeholder={searchConfig.placeholder}
                             autoComplete="off"
                             autoFocus
-                            disabled={isOffline}
+                            disabled={networkEngine === 'offline'}
                             onKeyDown={(event) => {
                                 if (event.key === 'Enter') {
                                     event.currentTarget.blur();
@@ -80,10 +97,10 @@ export function StartPage() {
                 </div>
             </main>
 
-            <NetworkStatus
-                statusClass={searchConfig.statusClass}
-                statusText={searchConfig.statusText}
-            />
+            <div id="network-status" aria-live="polite" aria-label="Network status">
+                <span id="network-indicator" className={searchConfig.statusClass} />
+                <span id="network-text">{searchConfig.statusText}</span>
+            </div>
         </>
     );
 }

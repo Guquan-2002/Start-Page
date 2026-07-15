@@ -3,9 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../shared/Icon.jsx';
 import { ChatComposer } from './components/ChatComposer.jsx';
 import { MessageList } from './components/MessageList.jsx';
-import { ChatSettings } from './config/ChatSettings.jsx';
-import { useChatConfig } from './config/useChatConfig.js';
+import { ChatSettings } from './settings/ChatSettings.jsx';
+import { useChatConfig } from './settings/useChatConfig.js';
 import { useChat } from './useChat.js';
+import './ChatFeature.css';
 
 const PANEL_MODE = {
     closed: 'closed',
@@ -29,7 +30,7 @@ export function ChatFeature() {
     });
 
     useEffect(() => {
-        if (!isOpen) return undefined;
+        if (!isOpen) return;
         document.body.classList.add('chat-open');
         return () => document.body.classList.remove('chat-open');
     }, [isOpen]);
@@ -47,30 +48,10 @@ export function ChatFeature() {
                 : chat.inputRef.current;
         }
 
-        if (!target) return undefined;
+        if (!target) return;
         const frameId = requestAnimationFrame(() => target.focus());
         return () => cancelAnimationFrame(frameId);
     }, [mode]);
-
-    const openChat = useCallback(() => {
-        setMode(PANEL_MODE.chat);
-    }, []);
-
-    const closeChat = useCallback(() => {
-        setMode(PANEL_MODE.closed);
-    }, []);
-
-    const clearConversation = useCallback(() => {
-        chat.clearConversation();
-    }, [chat.clearConversation]);
-
-    const sendMessage = useCallback(() => {
-        return chat.sendMessage();
-    }, [chat.sendMessage]);
-
-    const stopGeneration = useCallback(() => {
-        chat.stopGeneration();
-    }, [chat.stopGeneration]);
 
     return (
         <>
@@ -82,7 +63,7 @@ export function ChatFeature() {
                 aria-controls="chat-panel"
                 aria-expanded={isOpen}
                 title="AI Chat"
-                onClick={openChat}
+                onClick={() => setMode(PANEL_MODE.chat)}
             >
                 <Icon name="comments" />
             </button>
@@ -94,10 +75,8 @@ export function ChatFeature() {
                 aria-label="AI Chat"
                 aria-hidden={!isOpen}
             >
-                <div id="chat-header" inert={settingsOpen}>
-                    <div id="chat-title-group">
-                        <span id="chat-title">AI Chat</span>
-                    </div>
+                <div id="chat-header">
+                    <span id="chat-title">AI Chat</span>
                     <div id="chat-header-actions">
                         <button
                             id="chat-settings-btn"
@@ -107,9 +86,7 @@ export function ChatFeature() {
                             aria-label="Settings"
                             aria-controls="chat-settings"
                             aria-expanded={settingsOpen}
-                            onClick={() => (
-                                settingsOpen ? closeSettings() : openSettings()
-                            )}
+                            onClick={settingsOpen ? closeSettings : openSettings}
                         >
                             <Icon name="settings" />
                         </button>
@@ -119,7 +96,7 @@ export function ChatFeature() {
                             title="Start new chat"
                             aria-label="Start new chat"
                             disabled={chat.isStreaming}
-                            onClick={clearConversation}
+                            onClick={chat.clearConversation}
                         >
                             <Icon name="trash" />
                         </button>
@@ -128,7 +105,7 @@ export function ChatFeature() {
                             type="button"
                             title="Close"
                             aria-label="Close chat"
-                            onClick={closeChat}
+                            onClick={() => setMode(PANEL_MODE.closed)}
                         >
                             <Icon name="close" />
                         </button>
@@ -146,7 +123,6 @@ export function ChatFeature() {
                     status={chat.status}
                     error={chat.error}
                     onRegenerate={chat.regenerateMessage}
-                    inert={settingsOpen}
                 />
 
                 <ChatComposer
@@ -155,11 +131,10 @@ export function ChatFeature() {
                     attachments={chat.attachments}
                     onAddFiles={chat.addFiles}
                     onRemoveAttachment={chat.removeAttachment}
-                    onSend={sendMessage}
-                    onStop={stopGeneration}
+                    onSend={chat.sendMessage}
+                    onStop={chat.stopGeneration}
                     isStreaming={chat.isStreaming}
                     inputRef={chat.inputRef}
-                    inert={settingsOpen}
                 />
             </div>
         </>

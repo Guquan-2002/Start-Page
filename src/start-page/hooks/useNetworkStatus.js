@@ -1,25 +1,24 @@
 import { useEffect, useState } from 'react';
 
-import { CONFIG, NETWORK_ENDPOINTS } from '../config.js';
-import { abortActiveRequests, fetchWithTimeout } from './service-utils.js';
+const NETWORK_CHECK_INTERVAL = 10 * 1000;
+const NETWORK_TIMEOUT = 2000;
+const NETWORK_ENDPOINTS = {
+    google: 'https://www.google.com/generate_204',
+    bing: 'https://www.bing.com/generate_204'
+};
 
 export function useNetworkStatus() {
     const [networkEngine, setNetworkEngine] = useState(null);
 
     useEffect(() => {
         let disposed = false;
-        let intervalId = null;
-        const activeControllers = new Set();
 
         const checkConnectivity = async (url) => {
             try {
-                await fetchWithTimeout(url, {
-                    activeControllers,
-                    timeoutMs: CONFIG.NETWORK_TIMEOUT,
-                    requestInit: {
-                        method: 'HEAD',
-                        mode: 'no-cors'
-                    }
+                await fetch(url, {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    signal: AbortSignal.timeout(NETWORK_TIMEOUT)
                 });
                 return true;
             } catch {
@@ -42,23 +41,14 @@ export function useNetworkStatus() {
             }
         };
 
-        const bootstrap = async () => {
-            await runNetworkCheck();
-            if (!disposed) {
-                intervalId = window.setInterval(() => {
-                    void runNetworkCheck();
-                }, CONFIG.NETWORK_CHECK_INTERVAL);
-            }
-        };
-
-        void bootstrap();
+        const intervalId = window.setInterval(() => {
+            void runNetworkCheck();
+        }, NETWORK_CHECK_INTERVAL);
+        void runNetworkCheck();
 
         return () => {
             disposed = true;
-            if (intervalId !== null) {
-                window.clearInterval(intervalId);
-            }
-            abortActiveRequests(activeControllers);
+            window.clearInterval(intervalId);
         };
     }, []);
 

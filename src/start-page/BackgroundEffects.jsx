@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
+import './BackgroundEffects.css';
 
-import { CONFIG } from './config.js';
+const STAR_COUNTS = { small: 300, medium: 80, big: 40 };
 
 function appendStars(stars, count, width, height, options) {
     for (let index = 0; index < count; index += 1) {
@@ -16,10 +17,10 @@ function appendStars(stars, count, width, height, options) {
     }
 }
 
-function createStars(counts, width, height) {
+function createStars(width, height) {
     const stars = [];
 
-    appendStars(stars, counts.small, width, height, {
+    appendStars(stars, STAR_COUNTS.small, width, height, {
         radius: 0.5,
         minSpeed: 0.3,
         speedRange: 0.2,
@@ -28,7 +29,7 @@ function createStars(counts, width, height) {
         minTwinkleSpeed: 0.002,
         twinkleSpeedRange: 0.003
     });
-    appendStars(stars, counts.medium, width, height, {
+    appendStars(stars, STAR_COUNTS.medium, width, height, {
         radius: 1,
         minSpeed: 0.15,
         speedRange: 0.1,
@@ -37,7 +38,7 @@ function createStars(counts, width, height) {
         minTwinkleSpeed: 0.001,
         twinkleSpeedRange: 0.002
     });
-    appendStars(stars, counts.big, width, height, {
+    appendStars(stars, STAR_COUNTS.big, width, height, {
         radius: 1.5,
         minSpeed: 0.08,
         speedRange: 0.07,
@@ -50,17 +51,16 @@ function createStars(counts, width, height) {
     return stars;
 }
 
-export function BackgroundEffects({ starCounts = CONFIG.STARS_COUNT }) {
+export function BackgroundEffects({ active }) {
     const canvasRef = useRef(null);
-    const { small, medium, big } = starCounts;
 
     useEffect(() => {
-        const canvas = canvasRef.current;
-        const context = canvas?.getContext('2d');
-        if (!canvas || !context) return undefined;
+        if (!active) return;
 
-        let disposed = false;
-        let frameId = null;
+        const canvas = canvasRef.current;
+        const context = canvas.getContext('2d');
+
+        let frameId;
         let resizeTimerId = null;
         let stars = [];
         let viewportWidth = 0;
@@ -68,22 +68,20 @@ export function BackgroundEffects({ starCounts = CONFIG.STARS_COUNT }) {
         let lastTime = window.performance.now();
 
         const resizeCanvas = () => {
-            const devicePixelRatio = window.devicePixelRatio || 1;
+            const { devicePixelRatio } = window;
             viewportWidth = window.innerWidth;
             viewportHeight = window.innerHeight;
 
-            canvas.width = Math.max(1, Math.floor(viewportWidth * devicePixelRatio));
-            canvas.height = Math.max(1, Math.floor(viewportHeight * devicePixelRatio));
+            canvas.width = Math.floor(viewportWidth * devicePixelRatio);
+            canvas.height = Math.floor(viewportHeight * devicePixelRatio);
             canvas.style.width = `${viewportWidth}px`;
             canvas.style.height = `${viewportHeight}px`;
             context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-            stars = createStars({ small, medium, big }, viewportWidth, viewportHeight);
+            stars = createStars(viewportWidth, viewportHeight);
             lastTime = window.performance.now();
         };
 
         const render = (time) => {
-            if (disposed) return;
-
             const deltaTime = time - lastTime;
             lastTime = time;
             context.clearRect(0, 0, viewportWidth, viewportHeight);
@@ -113,7 +111,7 @@ export function BackgroundEffects({ starCounts = CONFIG.STARS_COUNT }) {
             }
             resizeTimerId = window.setTimeout(() => {
                 resizeTimerId = null;
-                if (!disposed) resizeCanvas();
+                resizeCanvas();
             }, 200);
         };
 
@@ -122,16 +120,13 @@ export function BackgroundEffects({ starCounts = CONFIG.STARS_COUNT }) {
         frameId = window.requestAnimationFrame(render);
 
         return () => {
-            disposed = true;
             window.removeEventListener('resize', handleResize);
             if (resizeTimerId !== null) {
                 window.clearTimeout(resizeTimerId);
             }
-            if (frameId !== null) {
-                window.cancelAnimationFrame(frameId);
-            }
+            window.cancelAnimationFrame(frameId);
         };
-    }, [small, medium, big]);
+    }, [active]);
 
     return (
         <div id="background-effects" aria-hidden="true">

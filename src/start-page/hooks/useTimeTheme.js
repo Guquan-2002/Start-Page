@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
-
-import { CONFIG } from '../config.js';
+import { useEffect, useState } from 'react';
 
 const TIME_THEME_CLASSES = [
     'morning',
@@ -8,6 +6,7 @@ const TIME_THEME_CLASSES = [
     'evening',
     'night'
 ];
+const THEME_CHECK_INTERVAL = 60 * 1000;
 
 function getTimeTheme(hour) {
     if (hour >= 6 && hour < 8) return 'morning';
@@ -16,25 +15,27 @@ function getTimeTheme(hour) {
     return 'night';
 }
 
-export function useTimeTheme(interval = CONFIG.THEME_CHECK_INTERVAL) {
+export function useTimeTheme() {
+    const [theme, setTheme] = useState(() => getTimeTheme(new Date().getHours()));
+
     useEffect(() => {
         const body = document.body;
-        const previousThemeClasses = TIME_THEME_CLASSES.filter((className) => (
-            body.classList.contains(className)
-        ));
 
         const updateTheme = () => {
+            const nextTheme = getTimeTheme(new Date().getHours());
             body.classList.remove(...TIME_THEME_CLASSES);
-            body.classList.add(getTimeTheme(new Date().getHours()));
+            body.classList.add(nextTheme);
+            setTheme(nextTheme);
         };
 
         updateTheme();
-        const timerId = window.setInterval(updateTheme, interval);
+        const timerId = window.setInterval(updateTheme, THEME_CHECK_INTERVAL);
 
         return () => {
             window.clearInterval(timerId);
             body.classList.remove(...TIME_THEME_CLASSES);
-            body.classList.add(...previousThemeClasses);
         };
-    }, [interval]);
+    }, []);
+
+    return theme;
 }

@@ -1,18 +1,16 @@
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { handleChatApi } from './src/server/chat-api.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;
 const HOST = process.env.HOST || DEFAULT_HOST;
-const ROOT_DIR = path.join(__dirname, 'dist');
+const PORT = Number(process.env.PORT ?? DEFAULT_PORT);
+const ROOT_DIR = fileURLToPath(new URL('./dist', import.meta.url));
 const ENTRY_FILE = path.join(ROOT_DIR, 'index.html');
 
 if (!existsSync(ENTRY_FILE)) {
@@ -20,37 +18,10 @@ if (!existsSync(ENTRY_FILE)) {
   process.exit(1);
 }
 
-function resolvePort(rawPort) {
-  if (!rawPort) {
-    return DEFAULT_PORT;
-  }
-
-  const port = Number(rawPort);
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    console.error(`Invalid PORT "${rawPort}". Expected an integer between 1 and 65535.`);
-    process.exit(1);
-  }
-
-  return port;
-}
-
-const PORT = resolvePort(process.env.PORT);
-
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
-  '.gif': 'image/gif',
   '.html': 'text/html; charset=utf-8',
-  '.ico': 'image/x-icon',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.map': 'application/json; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.png': 'image/png',
-  '.svg': 'image/svg+xml',
-  '.txt': 'text/plain; charset=utf-8',
-  '.webp': 'image/webp'
+  '.js': 'text/javascript; charset=utf-8'
 };
 
 function sendText(response, statusCode, message) {
@@ -78,10 +49,6 @@ function resolvePath(urlPath) {
     return { statusCode: 403, message: 'Forbidden' };
   }
 
-  if (existsSync(resolvedPath) && statSync(resolvedPath).isDirectory()) {
-    return { filePath: path.join(resolvedPath, 'index.html') };
-  }
-
   return { filePath: resolvedPath };
 }
 
@@ -90,7 +57,7 @@ const server = createServer(async (request, response) => {
     return;
   }
 
-  const requestPath = request.url === '/' ? '/index.html' : request.url || '/index.html';
+  const requestPath = request.url === '/' ? '/index.html' : request.url;
   const resolved = resolvePath(requestPath);
 
   if (!resolved.filePath) {
@@ -113,8 +80,6 @@ const server = createServer(async (request, response) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Start Page listening on http://${HOST}:${PORT}`);
-  console.log(`Local access: http://localhost:${PORT}`);
-  console.log(`Serving production build from ${ROOT_DIR}`);
 });
 
 server.on('error', (error) => {
