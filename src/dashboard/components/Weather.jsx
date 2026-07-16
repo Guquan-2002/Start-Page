@@ -54,7 +54,7 @@ const WEATHER_ICONS = [
 const INITIAL_WEATHER = {
     icon: 'spinner',
     spinning: true,
-    details: 'Loading weather...'
+    details: '正在加载天气...'
 };
 const WEATHER_REQUEST_TIMEOUT_MS = 10000;
 const WEATHER_UPDATE_INTERVAL = 30 * 60 * 1000;
@@ -151,7 +151,7 @@ export function Weather({ networkEngine }) {
             href="https://weather.cma.cn/web/weather"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Weather information"
+            aria-label="天气信息"
         >
             <Icon
                 id="weather-icon"

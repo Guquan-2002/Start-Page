@@ -86,8 +86,8 @@ export function Composer({
                                 <button
                                     type="button"
                                     className="assistant-attachment-remove-button"
-                                    title="Remove image"
-                                    aria-label={`Remove image ${index + 1}`}
+                                    title="移除图片"
+                                    aria-label={`移除第 ${index + 1} 张图片`}
                                     disabled={isStreaming}
                                     onClick={() => onRemoveAttachment(index)}
                                 >
@@ -100,7 +100,7 @@ export function Composer({
                 <textarea
                     ref={inputRef}
                     id="assistant-input"
-                    placeholder="Type your message..."
+                    placeholder="输入消息..."
                     rows={1}
                     value={input}
                     disabled={isStreaming}
@@ -113,8 +113,8 @@ export function Composer({
                 <button
                     type="button"
                     id="assistant-stop-button"
-                    title="Stop generation"
-                    aria-label="Stop generation"
+                    title="停止生成"
+                    aria-label="停止生成"
                     onClick={onStop}
                 >
                     <Icon name="stop" />
@@ -124,8 +124,8 @@ export function Composer({
                     type="button"
                     id="assistant-send-button"
                     className={input.trim().length > 0 ? 'has-text' : undefined}
-                    title="Send"
-                    aria-label="Send"
+                    title="发送"
+                    aria-label="发送"
                     onClick={onSend}
                 >
                     <Icon name="send" />

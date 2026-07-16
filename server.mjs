@@ -15,7 +15,7 @@ const ROOT_DIR = fileURLToPath(new URL('./dist', import.meta.url));
 const ENTRY_FILE = path.join(ROOT_DIR, 'index.html');
 
 if (!existsSync(ENTRY_FILE)) {
-  console.error('Production build not found. Run "npm run build" before "npm start".');
+  console.error('未找到生产构建。请先运行 "npm run build" 再执行 "npm start"。');
   process.exit(1);
 }
 
@@ -39,7 +39,7 @@ function resolvePath(urlPath) {
   try {
     decodedPath = decodeURIComponent(urlPath.split('?')[0]);
   } catch {
-    return { statusCode: 400, message: 'Bad Request' };
+    return { statusCode: 400, message: '请求无效' };
   }
 
   const normalizedPath = path.normalize(decodedPath.replace(/^([\\/])+/, ''));
@@ -47,7 +47,7 @@ function resolvePath(urlPath) {
   const relativePath = path.relative(ROOT_DIR, resolvedPath);
 
   if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-    return { statusCode: 403, message: 'Forbidden' };
+    return { statusCode: 403, message: '禁止访问' };
   }
 
   return { filePath: resolvedPath };
@@ -75,7 +75,7 @@ const server = createServer(async (request, response) => {
   try {
     await access(filePath);
   } catch {
-    sendText(response, 404, 'Not Found');
+    sendText(response, 404, '未找到');
     return;
   }
 
@@ -88,6 +88,6 @@ server.listen(PORT, HOST, () => {
 });
 
 server.on('error', (error) => {
-  console.error('Server failed to start:', error.message);
+  console.error('服务器启动失败：', error.message);
   process.exit(1);
 });

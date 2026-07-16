@@ -13,7 +13,7 @@ function readAttachment(file) {
             url: String(reader.result)
         });
         reader.onerror = () => reject(
-            new Error(`Failed to read ${file.name}.`)
+            new Error(`读取文件失败: ${file.name}`)
         );
 
         reader.readAsDataURL(file);
@@ -21,8 +21,8 @@ function readAttachment(file) {
 }
 
 function getProviderConfigError(providerConfig) {
-    if (!providerConfig.apiKey.trim()) return 'API Key is required.';
-    if (!providerConfig.model.trim()) return 'Model is required.';
+    if (!providerConfig.apiKey.trim()) return '请输入 API Key';
+    if (!providerConfig.model.trim()) return '请输入模型名称';
     return '';
 }
 

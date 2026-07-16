@@ -6,7 +6,7 @@ const ENGINE_UI_CONFIGS = {
         action: '#',
         placeholder: '使用 Google 搜索',
         statusClass: '',
-        statusText: 'Checking network...'
+        statusText: '正在检测网络...'
     },
     google: {
         action: 'https://www.google.com/search',
@@ -41,7 +41,7 @@ export function SearchEngine({ networkEngine }) {
                     target="_blank"
                 >
                     <label htmlFor="search-input" className="sr-only">
-                        Search
+                        搜索
                     </label>
                     <input
                         type="text"

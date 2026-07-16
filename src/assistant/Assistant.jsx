@@ -59,10 +59,10 @@ export function Assistant() {
                 id="assistant-toggle"
                 ref={toggleRef}
                 type="button"
-                aria-label="Open assistant"
+                aria-label="打开助手"
                 aria-controls="assistant-panel"
                 aria-expanded={isPanelOpen}
-                title="AI Assistant"
+                title="AI 助手"
                 onClick={() => setPanelMode(PANEL_MODE.conversation)}
             >
                 <Icon name="comments" />
@@ -72,18 +72,18 @@ export function Assistant() {
                 id="assistant-panel"
                 className={isPanelOpen ? undefined : 'assistant-hidden'}
                 role="dialog"
-                aria-label="AI Assistant"
+                aria-label="AI 助手"
                 aria-hidden={!isPanelOpen}
             >
                 <div id="assistant-header">
-                    <span id="assistant-title">AI Assistant</span>
+                    <span id="assistant-title">AI 助手</span>
                     <div id="assistant-header-actions">
                         <button
                             id="assistant-settings-button"
                             ref={settingsButtonRef}
                             type="button"
-                            title="Settings"
-                            aria-label="Settings"
+                            title="设置"
+                            aria-label="设置"
                             aria-controls="assistant-settings"
                             aria-expanded={isSettingsOpen}
                             onClick={isSettingsOpen ? closeSettings : openSettings}
@@ -93,8 +93,8 @@ export function Assistant() {
                         <button
                             id="assistant-clear-button"
                             type="button"
-                            title="Start new conversation"
-                            aria-label="Start new conversation"
+                            title="新建对话"
+                            aria-label="新建对话"
                             disabled={conversation.isStreaming}
                             onClick={conversation.clearConversation}
                         >
@@ -103,8 +103,8 @@ export function Assistant() {
                         <button
                             id="assistant-close-button"
                             type="button"
-                            title="Close"
-                            aria-label="Close assistant"
+                            title="关闭"
+                            aria-label="关闭助手"
                             onClick={() => setPanelMode(PANEL_MODE.closed)}
                         >
                             <Icon name="close" />

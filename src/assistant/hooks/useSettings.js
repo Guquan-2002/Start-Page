@@ -16,7 +16,7 @@ const DEFAULT_SETTINGS = {
             searchEnabled: false
         }
     ])),
-    systemPrompt: 'You are a helpful assistant.'
+    systemPrompt: '你是一个有帮助的助手。'
 };
 
 function readSettings() {
@@ -68,7 +68,7 @@ export function useSettings() {
                 model: providerDefinition.defaults.model
             },
             reasoning: {
-                label: 'Reasoning (optional)',
+                label: '推理（可选）',
                 ...providerDefinition.reasoning
             },
             search: providerDefinition.search

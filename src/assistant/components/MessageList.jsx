@@ -38,14 +38,14 @@ function ReasoningPart({ part, isStreaming }) {
 
     return (
         <details className="assistant-reasoning" open={isStreaming || undefined}>
-            <summary>Reasoning</summary>
+            <summary>推理过程</summary>
             <MarkdownMessage text={part.text} isStreaming={isStreaming} />
         </details>
     );
 }
 
 function SourcePart({ part }) {
-    const label = part.title || part.filename || part.url || 'Source';
+    const label = part.title || part.filename || part.url || '来源';
 
     return part.type === 'source-url' ? (
         <a
@@ -117,8 +117,8 @@ function MessageItem({ message, isStreaming, isPending, onRegenerate }) {
                 <button
                     type="button"
                     className="assistant-regenerate-button"
-                    title="Regenerate response"
-                    aria-label="Regenerate response"
+                    title="重新生成回复"
+                    aria-label="重新生成回复"
                     disabled={isPending}
                     onClick={() => onRegenerate(message.id)}
                 >
@@ -162,7 +162,7 @@ export function MessageList({
             {messages.length === 0 && !isPending && !error ? (
                 <div id="assistant-empty-state">
                     <Icon name="comments" />
-                    <span>Start a conversation</span>
+                    <span>开始对话</span>
                 </div>
             ) : messages.map((message) => (
                 <MessageItem
@@ -177,12 +177,12 @@ export function MessageList({
             ))}
             {showStreamingPlaceholder ? (
                 <div className="assistant-message assistant is-streaming is-streaming-placeholder">
-                    Thinking...
+                    思考中...
                 </div>
             ) : null}
             {error ? (
                 <div className="assistant-message error" role="alert">
-                    <div className="assistant-error-title">Unable to complete the request</div>
+                    <div className="assistant-error-title">请求无法完成</div>
                     <div className="assistant-error-detail">{error}</div>
                 </div>
             ) : null}

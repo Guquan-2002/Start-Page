@@ -48,16 +48,16 @@ export function Settings({
             <div className="assistant-settings-layout">
                 <div className="assistant-settings-header">
                     <div className="assistant-settings-title-group">
-                        <span id="assistant-settings-title" className="assistant-settings-title">AI Settings</span>
+                        <span id="assistant-settings-title" className="assistant-settings-title">AI 设置</span>
                         <small className="assistant-settings-subtitle">
-                            Configure provider, API URL, key, model, prompt, and optional features.
+                           配置服务商、API 地址、密钥、模型、提示词及其他选项。
                         </small>
                     </div>
                     <button
                         id="assistant-settings-close-button"
                         type="button"
-                        title="Close settings"
-                        aria-label="Close settings"
+                        title="关闭设置"
+                        aria-label="关闭设置"
                         onClick={onClose}
                     >
                         <Icon name="close" />
@@ -66,7 +66,7 @@ export function Settings({
 
                 <div className="assistant-settings-content">
                     <label htmlFor="assistant-settings-provider">
-                        Provider
+                        服务商
                         <select
                             id="assistant-settings-provider"
                             autoFocus
@@ -82,7 +82,7 @@ export function Settings({
                     </label>
 
                     <label htmlFor="assistant-settings-api-url">
-                        API URL
+                        API 地址
                         <input
                             id="assistant-settings-api-url"
                             type="text"
@@ -94,7 +94,7 @@ export function Settings({
                     </label>
 
                     <label htmlFor="assistant-settings-api-key">
-                        API Key
+                        API 密钥
                         <input
                             id="assistant-settings-api-key"
                             type="password"
@@ -106,7 +106,7 @@ export function Settings({
                     </label>
 
                     <label htmlFor="assistant-settings-model">
-                        Model
+                        模型
                         <input
                             id="assistant-settings-model"
                             type="text"
@@ -118,12 +118,12 @@ export function Settings({
                     </label>
 
                     <label htmlFor="assistant-settings-system-prompt">
-                        System Prompt
+                        系统提示词
                         <textarea
                             id="assistant-settings-system-prompt"
                             rows={3}
                             value={settingsValues.systemPrompt}
-                            placeholder="You are a helpful assistant."
+                            placeholder="你是一个有帮助的助手。"
                             onChange={(event) => setSystemPrompt(event.target.value)}
                         />
                     </label>
@@ -135,7 +135,7 @@ export function Settings({
                             value={activeProfile.reasoning}
                             onChange={(event) => updateProfile('reasoning', event.target.value)}
                         >
-                            <option value="">Auto</option>
+                            <option value="">自动</option>
                             {reasoningOptions.options.map((value) => (
                                 <option key={value} value={value}>{value}</option>
                             ))}
@@ -157,7 +157,7 @@ export function Settings({
                                 disabled={searchOptions.supported === false}
                                 onChange={(event) => updateProfile('searchEnabled', event.target.checked)}
                             />
-                            <span>Enable Web Search</span>
+                            <span>启用网络搜索</span>
                         </label>
                         <small id="assistant-settings-search-note" className="assistant-settings-note">
                             {searchOptions.note}

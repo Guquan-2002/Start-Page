@@ -46,7 +46,7 @@ function sendApiError(response, statusCode, message, headers = {}) {
 async function readRequestBody(request) {
     const contentLength = Number(request.headers['content-length']);
     if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
-        throw new ProviderApiError(413, 'Request body is too large.');
+        throw new ProviderApiError(413, '请求体过大。');
     }
 
     const chunks = [];
@@ -55,37 +55,37 @@ async function readRequestBody(request) {
     for await (const chunk of request) {
         totalBytes += chunk.byteLength;
         if (totalBytes > MAX_REQUEST_BYTES) {
-            throw new ProviderApiError(413, 'Request body is too large.');
+            throw new ProviderApiError(413, '请求体过大。');
         }
         chunks.push(chunk);
     }
 
     if (chunks.length === 0) {
-        throw new ProviderApiError(400, 'A JSON request body is required.');
+        throw new ProviderApiError(400, '需要 JSON 请求体。');
     }
 
     try {
         return JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch {
-        throw new ProviderApiError(400, 'Request body must be valid JSON.');
+        throw new ProviderApiError(400, '请求体必须是有效的 JSON。');
     }
 }
 
 function normalizeBaseUrl(rawApiUrl) {
     const baseURL = (rawApiUrl || '').trim().replace(/\/+$/, '');
     if (!baseURL) {
-        throw new ProviderApiError(400, 'API URL is required.');
+        throw new ProviderApiError(400, 'API 地址不能为空。');
     }
 
     let parsed;
     try {
         parsed = new URL(baseURL);
     } catch {
-        throw new ProviderApiError(400, 'API URL must be an absolute URL.');
+        throw new ProviderApiError(400, 'API 地址必须是绝对 URL。');
     }
 
     if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-        throw new ProviderApiError(400, 'API URL must use HTTP or HTTPS.');
+        throw new ProviderApiError(400, 'API 地址必须使用 HTTP 或 HTTPS。');
     }
 
     return baseURL;
@@ -97,24 +97,24 @@ function normalizeProviderConfig(rawProviderConfig) {
         || typeof rawProviderConfig !== 'object'
         || Array.isArray(rawProviderConfig)
     ) {
-        throw new ProviderApiError(400, 'Provider config is required.');
+        throw new ProviderApiError(400, '服务商配置不能为空。');
     }
 
     const provider = (rawProviderConfig.provider || '').trim().toLowerCase();
     const providerDefinition = getProviderDefinition(provider);
     if (!providerDefinition) {
-        throw new ProviderApiError(400, `Unsupported provider "${provider || '(empty)'}".`);
+        throw new ProviderApiError(400, `不支持的服务商 "${provider || '(空)'}"。`);
     }
 
     const apiKey = (rawProviderConfig.apiKey || '').trim();
     const model = (rawProviderConfig.model || '').trim();
-    if (!apiKey) throw new ProviderApiError(400, 'API Key is required.');
-    if (!model) throw new ProviderApiError(400, 'Model is required.');
+    if (!apiKey) throw new ProviderApiError(400, 'API 密钥不能为空。');
+    if (!model) throw new ProviderApiError(400, '模型不能为空。');
     const normalizedApiUrl = normalizeBaseUrl(rawProviderConfig.apiUrl);
 
     const reasoning = (rawProviderConfig.reasoning || '').trim().toLowerCase();
     if (reasoning && !providerDefinition.reasoning.options.includes(reasoning)) {
-        throw new ProviderApiError(400, `Unsupported reasoning value "${reasoning}" for ${provider}.`);
+        throw new ProviderApiError(400, `服务商 ${provider} 不支持推理值 "${reasoning}"。`);
     }
 
     return {
@@ -136,7 +136,7 @@ function createDisconnectSignal(request, response) {
 
     const abort = () => {
         if (!controller.signal.aborted && !response.writableEnded) {
-            controller.abort(new Error('Client disconnected.'));
+            controller.abort(new Error('客户端已断开。'));
         }
     };
     const cleanup = () => {
@@ -167,17 +167,17 @@ export async function handleProviderApi(request, response, next) {
     }
 
     if (request.method !== 'POST') {
-        sendApiError(response, 405, 'Method Not Allowed', { Allow: 'POST' });
+        sendApiError(response, 405, '方法不允许', { Allow: 'POST' });
         return true;
     }
 
     try {
         const requestBody = await readRequestBody(request);
         if (!requestBody || typeof requestBody !== 'object' || Array.isArray(requestBody)) {
-            throw new ProviderApiError(400, 'Request body must be a JSON object.');
+            throw new ProviderApiError(400, '请求体必须是 JSON 对象。');
         }
         if (!Array.isArray(requestBody.messages) || requestBody.messages.length === 0) {
-            throw new ProviderApiError(400, 'messages must be a non-empty array.');
+            throw new ProviderApiError(400, '消息列表不能为空。');
         }
 
         const providerConfig = normalizeProviderConfig(requestBody.providerConfig);

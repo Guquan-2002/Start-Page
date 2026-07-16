@@ -38,7 +38,7 @@ export async function handleNetworkStatusApi(request, response, next) {
             Allow: 'GET',
             'Content-Type': 'text/plain; charset=utf-8'
         });
-        response.end('Method Not Allowed');
+        response.end('方法不允许');
         return true;
     }
 
