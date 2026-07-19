@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { handleProviderApi } from './src/assistant/server/provider-api.js';
-import { handleSystemStatusApi } from './src/dashboard/server/system-status-api.js';
+import { handleSystemStatusApi } from './src/dashboard/server/systemStatusApi.js';
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;

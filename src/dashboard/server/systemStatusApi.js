@@ -7,10 +7,6 @@ const POWERSHELL_TIMEOUT_MS = 10 * 1000;
 // 输出三个数字：CPU 百分比、物理内存总量 KB、可用内存 MB
 const PS_COMMAND = `$c = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'"; $o = Get-CimInstance Win32_OperatingSystem; $m = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory; "$($c.PercentProcessorTime) $($o.TotalVisibleMemorySize) $($m.AvailableMBytes)"`;
 
-function getRequestPath(request) {
-    return new URL(request.url, 'http://localhost').pathname;
-}
-
 function sendJson(response, statusCode, payload) {
     response.writeHead(statusCode, {
         'Cache-Control': 'no-store',
@@ -47,12 +43,8 @@ function queryWindowsStatus() {
     });
 }
 
-function getSystemStatus() {
-    return queryWindowsStatus();
-}
-
 export async function handleSystemStatusApi(request, response, next) {
-    if (getRequestPath(request) !== SYSTEM_STATUS_API_PATH) {
+    if (new URL(request.url, 'http://localhost').pathname !== SYSTEM_STATUS_API_PATH) {
         next?.();
         return false;
     }
@@ -67,7 +59,7 @@ export async function handleSystemStatusApi(request, response, next) {
     }
 
     try {
-        sendJson(response, 200, await getSystemStatus());
+        sendJson(response, 200, await queryWindowsStatus());
     } catch (error) {
         console.error('读取系统状态失败:', error.message);
         sendJson(response, 500, { error: '读取系统状态失败' });

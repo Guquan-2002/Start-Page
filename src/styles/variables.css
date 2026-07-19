@@ -52,7 +52,7 @@
     --assistant-danger-strong: rgba(255, 80, 80, 0.6);
 
     --net-ok-global: #66CCFF;
-    --net-ok-local: #00EE00;
+    --net-ok-cn: #00EE00;
     --net-fail: #EE0000;
     --net-checking: #EEEE00;
 }

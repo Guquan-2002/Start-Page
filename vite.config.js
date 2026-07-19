@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 import { handleProviderApi } from './src/assistant/server/provider-api.js';
-import { handleSystemStatusApi } from './src/dashboard/server/system-status-api.js';
+import { handleSystemStatusApi } from './src/dashboard/server/systemStatusApi.js';
 
 export default defineConfig({
     base: './',

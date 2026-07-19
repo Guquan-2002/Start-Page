@@ -34,8 +34,8 @@
     transition: background-color 0.5s ease;
 }
 
-#network-indicator.google-ok { background-color: var(--net-ok-global); }
-#network-indicator.bing-ok { background-color: var(--net-ok-local); }
+#network-indicator.global { background-color: var(--net-ok-global); }
+#network-indicator.cn { background-color: var(--net-ok-cn); }
 #network-indicator.net-fail { background-color: var(--net-fail); }
 
 @media (max-width: 768px) {

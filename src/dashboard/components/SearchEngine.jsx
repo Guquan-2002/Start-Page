@@ -6,11 +6,11 @@ const ENGINE_UI_CONFIGS = {
         action: '#',
         placeholder: '使用 Google 搜索'
     },
-    google: {
+    global: {
         action: 'https://www.google.com/search',
         placeholder: '使用 Google 搜索'
     },
-    bing: {
+    cn: {
         action: 'https://cn.bing.com/search',
         placeholder: '使用 Bing 搜索'
     },
@@ -20,8 +20,8 @@ const ENGINE_UI_CONFIGS = {
     }
 };
 
-export function SearchEngine({ networkEngine }) {
-    const engineUi = ENGINE_UI_CONFIGS[networkEngine ?? 'checking'];
+export function SearchEngine({ networkConnectivity }) {
+    const engineUi = ENGINE_UI_CONFIGS[networkConnectivity ?? 'checking'];
 
     return (
         <div id="search-container" role="search">
@@ -41,7 +41,7 @@ export function SearchEngine({ networkEngine }) {
                     placeholder={engineUi.placeholder}
                     autoComplete="off"
                     autoFocus
-                    disabled={networkEngine === 'offline'}
+                    disabled={networkConnectivity === 'offline'}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                             event.currentTarget.blur();
