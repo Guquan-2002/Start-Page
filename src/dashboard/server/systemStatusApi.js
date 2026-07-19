@@ -1,11 +1,9 @@
 import { execFile } from 'node:child_process';
 
-const SYSTEM_STATUS_API_PATH = '/api/system';
-const POWERSHELL_TIMEOUT_MS = 10 * 1000;
-
 // 通过 WSL 互操作读取 Windows 宿主机状态（os.* 只能看到 WSL 虚拟机的裁剪视图）
 // 输出三个数字：CPU 百分比、物理内存总量 KB、可用内存 MB
 const PS_COMMAND = `$c = Get-CimInstance Win32_PerfFormattedData_PerfOS_Processor -Filter "Name='_Total'"; $o = Get-CimInstance Win32_OperatingSystem; $m = Get-CimInstance Win32_PerfFormattedData_PerfOS_Memory; "$($c.PercentProcessorTime) $($o.TotalVisibleMemorySize) $($m.AvailableMBytes)"`;
+const POWERSHELL_TIMEOUT_MS = 20_000;
 
 function sendJson(response, statusCode, payload) {
     response.writeHead(statusCode, {
@@ -44,18 +42,9 @@ function queryWindowsStatus() {
 }
 
 export async function handleSystemStatusApi(request, response, next) {
-    if (new URL(request.url, 'http://localhost').pathname !== SYSTEM_STATUS_API_PATH) {
+    if (new URL(request.url, 'http://localhost').pathname !== '/api/system') {
         next?.();
         return false;
-    }
-
-    if (request.method !== 'GET') {
-        response.writeHead(405, {
-            Allow: 'GET',
-            'Content-Type': 'text/plain; charset=utf-8'
-        });
-        response.end('方法不允许');
-        return true;
     }
 
     try {

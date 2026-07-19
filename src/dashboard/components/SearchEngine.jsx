@@ -2,22 +2,10 @@ import { Icon } from '../../shared/Icon.jsx';
 import './SearchEngine.css';
 
 const ENGINE_UI_CONFIGS = {
-    checking: {
-        action: '#',
-        placeholder: '使用 Google 搜索'
-    },
-    global: {
-        action: 'https://www.google.com/search',
-        placeholder: '使用 Google 搜索'
-    },
-    cn: {
-        action: 'https://cn.bing.com/search',
-        placeholder: '使用 Bing 搜索'
-    },
-    offline: {
-        action: '#',
-        placeholder: '网络连接不可用'
-    }
+    checking: { action: '#', placeholder: '使用 Google 搜索' },
+    global: { action: 'https://www.google.com/search', placeholder: '使用 Google 搜索' },
+    cn: { action: 'https://cn.bing.com/search', placeholder: '使用 Bing 搜索' },
+    offline: { action: '#', placeholder: '网络连接不可用' }
 };
 
 export function SearchEngine({ networkConnectivity }) {

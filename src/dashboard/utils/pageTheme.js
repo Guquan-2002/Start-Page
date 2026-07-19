@@ -1,4 +1,4 @@
-export const STAR_COUNTS = { small: 300, medium: 80, big: 40 };
+const STAR_COUNTS = { small: 300, medium: 80, big: 40 };
 
 function appendStars(stars, count, width, height, options) {
     for (let index = 0; index < count; index += 1) {

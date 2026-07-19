@@ -1,16 +1,13 @@
 import { useSystemStatus } from '../hooks/useSystemStatus.js';
 import './SystemStatus.css';
 
-function formatGB(mb) {
-    return (mb / 1024).toFixed(1);
-}
 
 export function SystemStatus() {
     const status = useSystemStatus();
 
-    const cpuText = status ? `${Math.round(status.cpuPercent)}%` : '--';
+    const cpuText = status ? `${Math.round(status.cpuPercent)} %` : '--';
     const memoryText = status
-        ? `${formatGB(status.memTotalMB - status.memAvailableMB)}/${formatGB(status.memTotalMB)}G`
+        ? `${((status.memTotalMB - status.memAvailableMB) / 1024).toFixed(1)} / ${(status.memTotalMB / 1024).toFixed(1)} G`
         : '--';
 
     return (

@@ -1,27 +1,20 @@
 import { useEffect, useState } from 'react';
+import { formatClock } from '../utils/clock.js';
 
 const TIME_UPDATE_INTERVAL = 1000;
-
-function formatClock(now) {
-    return {
-        time: now.toLocaleTimeString('zh-CN', { hour12: false }),
-        date: `${now.toLocaleDateString('zh-CN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        })} ${now.toLocaleDateString('zh-CN', { weekday: 'long' })}`,
-    };
-}
 
 export function useClock() {
     const [now, setNow] = useState(() => new Date());
 
     useEffect(() => {
-        const timerId = window.setInterval(() => {
+        const update = () => {
             setNow(new Date());
-        }, TIME_UPDATE_INTERVAL);
+        };
 
-        return () => window.clearInterval(timerId);
+        void update();
+        const intervalId = window.setInterval(update, TIME_UPDATE_INTERVAL);
+
+        return () => window.clearInterval(intervalId);
     }, []);
 
     return formatClock(now);

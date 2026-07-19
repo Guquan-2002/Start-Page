@@ -1,20 +1,32 @@
 import { useEffect, useState } from 'react';
-import { runWeatherCheck, promptWeatherSetupIfNeeded } from '../utils/weatherApi.js';
+import { fetchWeatherNow } from '../utils/weatherApi.js';
 
 const WEATHER_UPDATE_INTERVAL = 30 * 60 * 1000;
+const WEATHER_REQUEST_TIMEOUT_MS = 10 * 1000;
 
 export function useWeather(networkConnectivity) {
-    const [weather, setWeather] = useState({ icon: 'spinner', spinning: true, details: '正在获取天气...' });
+    const [weather, setWeather] = useState({ status: 'loading' });
 
     useEffect(() => {
-        if (promptWeatherSetupIfNeeded() || networkConnectivity === null) {
+        if (networkConnectivity === null) {
             return;
         }
 
-        void runWeatherCheck(networkConnectivity, setWeather);
-        const intervalId = window.setInterval(() => {
-            void runWeatherCheck(networkConnectivity, setWeather);
-        }, WEATHER_UPDATE_INTERVAL);
+        const update = async () => {
+            setWeather({ status: 'loading' });
+            try {
+                const data = await fetchWeatherNow(
+                    networkConnectivity,
+                    AbortSignal.timeout(WEATHER_REQUEST_TIMEOUT_MS),
+                );
+                setWeather({ status: 'success', ...data });
+            } catch {
+                setWeather({ status: 'error' });
+            }
+        };
+
+        void update();
+        const intervalId = window.setInterval(update, WEATHER_UPDATE_INTERVAL);
 
         return () => window.clearInterval(intervalId);
     }, [networkConnectivity]);

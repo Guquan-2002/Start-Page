@@ -6,21 +6,15 @@ export function useSystemStatus() {
     const [status, setStatus] = useState(null);
 
     useEffect(() => {
-        const updateSystemStatus = async () => {
-            try {
-                const response = await fetch('/api/system');
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                setStatus(data);
-            } catch (error) {
-                console.error('读取系统状态失败:', error);
-            }
+        const update = async () => {
+            const response = await fetch('/api/system');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const data = await response.json();
+            setStatus(data);
         };
 
-        void updateSystemStatus();
-        const intervalId = window.setInterval(() => {
-            void updateSystemStatus();
-        }, SYSTEM_CHECK_INTERVAL);
+        void update();
+        const intervalId = window.setInterval(update, SYSTEM_CHECK_INTERVAL);
 
         return () => window.clearInterval(intervalId);
     }, []);
