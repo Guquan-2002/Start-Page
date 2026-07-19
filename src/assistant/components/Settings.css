@@ -10,7 +10,7 @@
     padding: 0;
     background: linear-gradient(180deg, var(--assistant-overlay-bg-start) 0%, var(--assistant-overlay-bg-end) 100%);
     backdrop-filter: blur(18px);
-    color: var(--text-color);
+    color: var(--assistant-text-color);
     overflow: hidden;
 
     &::backdrop {
@@ -77,7 +77,7 @@
     border: none;
     border-radius: 8px;
     background: var(--assistant-soft-bg);
-    color: var(--text-color);
+    color: var(--assistant-text-color);
     font-size: 0.85rem;
     cursor: pointer;
     flex-shrink: 0;
@@ -121,7 +121,7 @@
     border: 1px solid var(--assistant-muted-border);
     border-radius: 10px;
     padding: 10px 12px;
-    color: var(--text-color);
+    color: var(--assistant-text-color);
     font-size: 0.86rem;
     font-family: inherit;
     transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;

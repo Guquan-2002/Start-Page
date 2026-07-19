@@ -1,10 +1,30 @@
 import { useEffect, useState } from 'react';
-import { createStars } from '../utils/pageTheme.js';
+import { createStars, STAR_RGB } from '../utils/pageTheme.js';
 
 // ======== Time-of-day theme ========
 
 const TIME_THEME_CLASSES = ['morning', 'day', 'evening', 'night'];
 const THEME_CHECK_INTERVAL = 60 * 1000;
+
+// 大星星的光晕用预渲染的径向渐变 sprite，避免每帧 shadowBlur 的性能开销
+const GLOW_SPRITE_SIZE = 64;
+const GLOW_DRAW_SCALE = 12;
+
+function createGlowSprite(rgb) {
+    const sprite = document.createElement('canvas');
+    sprite.width = GLOW_SPRITE_SIZE;
+    sprite.height = GLOW_SPRITE_SIZE;
+    const spriteContext = sprite.getContext('2d');
+    const center = GLOW_SPRITE_SIZE / 2;
+    const gradient = spriteContext.createRadialGradient(center, center, 0, center, center, center);
+    gradient.addColorStop(0, `rgba(${rgb}, 1)`);
+    gradient.addColorStop(0.25, `rgba(${rgb}, 0.55)`);
+    gradient.addColorStop(0.6, `rgba(${rgb}, 0.15)`);
+    gradient.addColorStop(1, `rgba(${rgb}, 0)`);
+    spriteContext.fillStyle = gradient;
+    spriteContext.fillRect(0, 0, GLOW_SPRITE_SIZE, GLOW_SPRITE_SIZE);
+    return sprite;
+}
 
 function getTimeTheme(hour) {
     if (hour >= 6 && hour < 8) return 'morning';
@@ -52,6 +72,27 @@ export function usePageTheme(canvasRef) {
         let viewportWidth = 0;
         let viewportHeight = 0;
         let lastTime = window.performance.now();
+        const glowSprites = {};
+
+        const getGlowSprite = (color) => {
+            if (!glowSprites[color]) {
+                glowSprites[color] = createGlowSprite(STAR_RGB[color]);
+            }
+            return glowSprites[color];
+        };
+
+        const drawStar = (star, alpha) => {
+            context.globalAlpha = alpha;
+            if (star.glow) {
+                const size = star.r * GLOW_DRAW_SCALE;
+                context.drawImage(getGlowSprite(star.color), star.x - size / 2, star.y - size / 2, size, size);
+            } else {
+                context.fillStyle = `rgb(${STAR_RGB[star.color]})`;
+                context.beginPath();
+                context.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                context.fill();
+            }
+        };
 
         const resizeCanvas = () => {
             const { devicePixelRatio } = window;
@@ -80,11 +121,7 @@ export function usePageTheme(canvasRef) {
                 }
 
                 star.twinklePhase += star.twinkleSpeed * deltaTime;
-                context.globalAlpha = star.alpha * (0.5 + 0.5 * Math.sin(star.twinklePhase));
-                context.fillStyle = '#fff';
-                context.beginPath();
-                context.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-                context.fill();
+                drawStar(star, star.alpha * (0.5 + 0.5 * Math.sin(star.twinklePhase)));
             });
 
             context.globalAlpha = 1;
@@ -93,13 +130,7 @@ export function usePageTheme(canvasRef) {
 
         const drawStatic = () => {
             context.clearRect(0, 0, viewportWidth, viewportHeight);
-            stars.forEach((star) => {
-                context.globalAlpha = star.alpha;
-                context.fillStyle = '#fff';
-                context.beginPath();
-                context.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-                context.fill();
-            });
+            stars.forEach((star) => drawStar(star, star.alpha));
             context.globalAlpha = 1;
         };
 
@@ -130,4 +161,6 @@ export function usePageTheme(canvasRef) {
             window.cancelAnimationFrame(frameId);
         };
     }, [active, canvasRef]);
+
+    return theme;
 }

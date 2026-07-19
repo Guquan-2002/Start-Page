@@ -1,29 +1,74 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
+}
+
+html {
+    min-height: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
 }
 
 @keyframes gradient-flow {
-    to { background-position: 100% 100%; }
+    to {
+        background-position: 100% 100%;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes fade-rise {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: none; }
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
 }
 
 @keyframes glow-drift {
-    25% { transform: translate(5%, -2%) scale(1.0); }
-    50% { transform: translate(0%, 5%) scale(1.05); }
-    75% { transform: translate(-5%, 0%) scale(0.95); }
-    100% { transform: translate(5%, 5%) scale(1.0); }
+    25% {
+        transform: translate(5%, -2%) scale(1);
+    }
+
+    50% {
+        transform: translate(0%, 5%) scale(1.05);
+    }
+
+    75% {
+        transform: translate(-5%, 0%) scale(0.95);
+    }
+
+    100% {
+        transform: translate(5%, 5%) scale(1);
+    }
 }
 
 body {
-    font-family: "霞鹜文楷 GB 屏幕阅读版";
-    color: var(--text-color);
+    min-height: 100dvh;
     overflow: hidden;
+    color: var(--text-color);
+    font-family: var(--font-family-base);
+    font-weight: var(--font-weight-regular);
     background: linear-gradient(
         var(--theme-angle),
         var(--theme-c1) var(--theme-p1, 0%),
@@ -32,10 +77,14 @@ body {
         var(--theme-c4) var(--theme-p4, 100%)
     );
     background-size: 400% 400%;
-    transition: --theme-angle 2s ease-in-out, --theme-c1 2s ease-in-out,
-        --theme-c2 2s ease-in-out, --theme-c3 2s ease-in-out,
-        --theme-c4 2s ease-in-out;
     animation: gradient-flow 24s ease-in-out infinite alternate;
+    transition:
+        color var(--theme-transition),
+        --theme-angle var(--theme-transition),
+        --theme-c1 var(--theme-transition),
+        --theme-c2 var(--theme-transition),
+        --theme-c3 var(--theme-transition),
+        --theme-c4 var(--theme-transition);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -46,8 +95,6 @@ body {
     position: absolute;
     width: 1px;
     height: 1px;
-    padding: 0;
-    margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
@@ -55,17 +102,25 @@ body {
 }
 
 body::before {
-    content: '';
     position: fixed;
     inset: 0;
     z-index: -1;
     pointer-events: none;
+    content: '';
     background:
-        radial-gradient(ellipse at 30% 70%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.5)) 0%, transparent 40%),
-        radial-gradient(ellipse at 70% 30%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.3)) 0%, transparent 30%);
+        radial-gradient(
+            ellipse at 30% 70%,
+            rgba(255, 255, 255, calc(var(--glow-intensity) * 0.5)) 0%,
+            transparent 40%
+        ),
+        radial-gradient(
+            ellipse at 70% 30%,
+            rgba(255, 255, 255, calc(var(--glow-intensity) * 0.3)) 0%,
+            transparent 30%
+        );
     opacity: 0.8;
-    animation: glow-drift 16s linear infinite alternate;
     mix-blend-mode: soft-light;
+    animation: glow-drift 16s linear infinite alternate;
     will-change: transform;
 }
 
@@ -77,8 +132,8 @@ body::before {
     }
 
     body::before {
-        animation: none;
         opacity: 0.5;
+        animation: none;
     }
 
     input[type="text"],
@@ -94,12 +149,9 @@ body::before {
         -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
     }
 
-    button:active {
-        opacity: 0.8;
-    }
-
+    button:active,
     a:active {
-        opacity: 0.7;
+        opacity: 0.8;
     }
 }
 
@@ -124,12 +176,9 @@ body::before {
     #time-container,
     #weather-container,
     #search-container,
-    #network-status {
-        animation: none;
-    }
-
-    .stars-bg::before,
-    .stars-bg::after {
+    #network-status,
+    .weather-config-overlay,
+    .weather-config-dialog {
         animation: none;
     }
 }

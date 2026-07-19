@@ -1,82 +1,92 @@
 .weather-config-overlay {
     position: fixed;
     inset: 0;
+    z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--overlay-bg);
     backdrop-filter: blur(4px);
-    z-index: 1000;
+    -webkit-backdrop-filter: blur(4px);
     animation: fade-in 0.2s ease-out;
 }
 
 .weather-config-dialog {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 24px;
+    gap: 0.75rem;
     min-width: 300px;
     max-width: 90vw;
-    background-color: var(--component-bg, rgba(30, 30, 40, 0.9));
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    padding: 1.5rem;
+    color: var(--text-color);
+    background-color: var(--dialog-bg);
+    border: 1px solid var(--dialog-border);
+    border-radius: var(--component-radius-lg);
+    box-shadow: var(--dialog-shadow);
+    backdrop-filter: var(--component-blur-strong);
+    -webkit-backdrop-filter: var(--component-blur-strong);
     animation: fade-rise 0.25s ease-out;
 }
 
 .weather-config-title {
-    margin: 0;
     font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--text-color);
+    font-weight: var(--font-weight-semibold);
 }
 
 .weather-config-hint {
-    margin: 0;
+    color: var(--text-color-muted);
     font-size: 0.85rem;
-    color: var(--text-color);
-    opacity: 0.7;
 }
 
 .weather-config-input {
     padding: 10px 14px;
-    font-size: 0.95rem;
     color: var(--text-color);
-    background-color: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
+    font-size: 0.95rem;
+    background-color: var(--field-bg);
+    border: 1px solid var(--field-border);
+    border-radius: var(--component-radius-sm);
     outline: none;
-    transition: border-color 0.2s ease;
+    transition:
+        border-color var(--interaction-transition),
+        box-shadow var(--interaction-transition);
+}
+
+.weather-config-input::placeholder {
+    color: var(--placeholder-color);
 }
 
 .weather-config-input:focus {
-    border-color: rgba(255, 255, 255, 0.5);
+    border-color: var(--field-border-focus);
+    box-shadow: var(--field-focus-ring);
 }
 
 .weather-config-save {
     align-self: flex-end;
-    margin-top: 4px;
+    margin-top: 0.25rem;
     padding: 8px 16px;
+    color: var(--action-text-color);
     font-size: 0.85rem;
-    border: none;
-    border-radius: 8px;
+    font-weight: var(--font-weight-medium);
+    background-color: var(--action-bg);
+    border: 0;
+    border-radius: var(--component-radius-sm);
     cursor: pointer;
-    background-color: rgba(100, 160, 255, 0.8);
-    color: #fff;
-    transition: opacity 0.2s ease, background-color 0.2s ease;
+    transition:
+        background-color var(--interaction-transition),
+        box-shadow var(--interaction-transition),
+        opacity var(--interaction-transition);
 }
 
 .weather-config-save:hover {
-    background-color: rgba(100, 160, 255, 1);
+    background-color: var(--action-bg-hover);
+}
+
+.weather-config-save:focus-visible {
+    outline: none;
+    box-shadow: var(--action-focus-ring);
 }
 
 .weather-config-save:disabled {
-    opacity: 0.4;
     cursor: not-allowed;
-}
-
-@keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    opacity: 0.4;
 }

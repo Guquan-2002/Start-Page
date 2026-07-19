@@ -1,37 +1,39 @@
 #weather-container {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: clamp(10px, 1vw, 12px);
-    color: var(--text-color);
-    text-decoration: none;
-    font-size: clamp(1.6rem, 1.5vw, 2rem);
-    font-weight: 400;
     padding: clamp(8px, 1vw, 12px) clamp(16px, 1.5vw, 24px);
+    color: var(--text-color);
+    font-size: clamp(1.6rem, 1.5vw, 2rem);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
     background-color: var(--component-bg);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
-    box-shadow: var(--component-highlight);
-    margin-bottom: clamp(2rem, 2.5vw, 2.5rem);
-    animation: fade-rise 0.6s ease-out 0.15s backwards;
-    transition: background-color 0.3s ease, border-color 0.3s ease,
-        transform 0.3s ease, box-shadow 0.3s ease;
+    border: 1px solid var(--component-border);
+    border-radius: var(--component-radius-lg);
+    box-shadow: var(--component-shadow);
+    backdrop-filter: var(--component-blur);
+    -webkit-backdrop-filter: var(--component-blur);
     cursor: pointer;
+    animation: fade-rise 0.6s ease-out 0.15s backwards;
+    transition:
+        background-color var(--interaction-transition),
+        border-color var(--interaction-transition),
+        box-shadow var(--interaction-transition),
+        transform var(--interaction-transition);
 }
 
 #weather-container:visited,
-#weather-container:active {
+#weather-container:active,
+#weather-container:hover {
     color: var(--text-color);
     text-decoration: none;
 }
 
 #weather-container:hover {
-    color: var(--text-color);
-    text-decoration: none;
-    background-color: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
+    background-color: var(--component-bg-hover);
+    border-color: var(--component-border-hover);
+    box-shadow: var(--component-shadow-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), var(--component-highlight-strong);
 }
 
 @media (max-width: 768px) {
@@ -42,7 +44,6 @@
 
 @media (max-width: 768px) and (orientation: landscape) {
     #weather-container {
-        margin-bottom: 1.2rem;
         font-size: 1.1rem;
     }
 }

@@ -38,6 +38,7 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
+    color: var(--assistant-text-color);
     background: var(--assistant-panel-bg);
     border-left: 1px solid var(--assistant-border);
     backdrop-filter: blur(20px);
@@ -78,12 +79,12 @@
     border: none;
     border-radius: 6px;
     background: none;
-    color: var(--text-color);
+    color: var(--assistant-text-color);
     font-size: 0.95rem;
     cursor: pointer;
     padding: 4px 8px;
     opacity: 0.7;
-    text-shadow: var(--text-shadow);
+    text-shadow: var(--assistant-text-shadow);
     transition: opacity 0.2s, background 0.2s;
 }
 

@@ -29,17 +29,79 @@
 }
 
 :root {
+    /* Typography */
+    --font-family-base: "霞鹜文楷 GB 屏幕阅读版", "LXGW WenKai GB Screen", "Noto Serif SC", serif;
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-variant-numeric: tabular-nums;
+
+    /* Motion */
+    --theme-transition: 2s ease-in-out;
+    --interaction-transition: 180ms ease;
+
+    /* Theme background */
     --glow-intensity: 0.1;
 
-    --text-color: white;
+    /* Foreground text */
+    --text-color: #fff;
+    --text-color-muted: rgba(255, 255, 255, 0.72);
     --text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    --placeholder-color: rgba(255, 255, 255, 0.7);
+    --time-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.3),
+        0 0 20px rgba(255, 255, 255, 0.15),
+        0 0 40px rgba(255, 255, 255, 0.08);
+    --placeholder-color: var(--text-color-muted);
+
+    /* Shared glass surface */
     --component-bg: rgba(255, 255, 255, 0.1);
+    --component-bg-hover: rgba(255, 255, 255, 0.18);
     --component-bg-focus: rgba(255, 255, 255, 0.25);
-    --component-shadow-focus: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --component-border: rgba(255, 255, 255, 0.15);
+    --component-border-hover: rgba(255, 255, 255, 0.3);
+    --component-border-focus: rgba(255, 255, 255, 0.4);
     --component-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.15);
     --component-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    --component-shadow: var(--component-highlight);
+    --component-shadow-hover:
+        0 4px 12px rgba(0, 0, 0, 0.15),
+        var(--component-highlight-strong);
+    --component-shadow-focus:
+        0 8px 24px rgba(0, 0, 0, 0.25),
+        0 0 0 3px rgba(255, 255, 255, 0.15),
+        var(--component-highlight-strong);
+    --component-blur: blur(10px);
+    --component-blur-strong: blur(16px) saturate(130%);
+    --component-radius-sm: 8px;
+    --component-radius-md: 14px;
+    --component-radius-lg: 20px;
+    --component-radius-xl: 32px;
+    --component-radius-pill: 999px;
 
+    /* Clock card */
+    --clock-border: rgba(255, 255, 255, 0.2);
+    --clock-divider: rgba(255, 255, 255, 0.2);
+    --clock-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+
+    /* Dialog and form controls */
+    --overlay-bg: rgba(0, 0, 0, 0.5);
+    --dialog-bg: rgba(20, 24, 38, 0.9);
+    --dialog-border: rgba(255, 255, 255, 0.15);
+    --dialog-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --field-bg: rgba(255, 255, 255, 0.08);
+    --field-border: rgba(255, 255, 255, 0.2);
+    --field-border-focus: rgba(255, 255, 255, 0.5);
+    --field-focus-ring: 0 0 0 3px rgba(255, 255, 255, 0.12);
+    --action-bg: rgba(100, 160, 255, 0.8);
+    --action-bg-hover: rgba(100, 160, 255, 1);
+    --action-focus-ring: 0 0 0 3px rgba(100, 160, 255, 0.35);
+    --action-text-color: #fff;
+
+    /* Assistant */
+    --assistant-text-color: #fff;
+    --assistant-text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     --assistant-panel-bg: rgba(20, 20, 30, 0.85);
     --assistant-overlay-bg-start: rgba(16, 22, 34, 0.97);
     --assistant-overlay-bg-end: rgba(14, 20, 32, 0.95);
@@ -51,6 +113,7 @@
     --assistant-danger: rgba(255, 80, 80, 0.4);
     --assistant-danger-strong: rgba(255, 80, 80, 0.6);
 
+    /* Network status colors intentionally remain time-theme independent. */
     --net-ok-global: #66CCFF;
     --net-ok-cn: #00EE00;
     --net-fail: #EE0000;
@@ -67,13 +130,11 @@
 }
 
 .day {
-    --theme-angle: -135deg;
-    --theme-c1: hsl(200, 100%, 70%);
-    --theme-c2: hsl(220, 70%, 70%);
-    --theme-c3: hsl(200, 70%, 70%);
-    --theme-c4: hsl(200, 70%, 70%);
-    --theme-p2: 50%;
-    --theme-p3: 100%;
+    --theme-angle: 180deg;
+    --theme-c1: hsl(208, 85%, 60%);
+    --theme-c2: hsl(202, 80%, 70%);
+    --theme-c3: hsl(196, 70%, 80%);
+    --theme-c4: hsl(48, 65%, 88%);
     --glow-intensity: 0.15;
 }
 
@@ -83,7 +144,7 @@
     --theme-c2: hsl(330, 50%, 50%);
     --theme-c3: hsl(270, 50%, 50%);
     --theme-c4: hsl(300, 70%, 70%);
-    --glow-intensity: 0.20;
+    --glow-intensity: 0.2;
 }
 
 .night {
@@ -92,5 +153,50 @@
     --theme-c2: hsl(180, 30%, 30%);
     --theme-c3: hsl(220, 20%, 30%);
     --theme-c4: hsl(200, 30%, 30%);
-    --glow-intensity: 0.10;
+    --glow-intensity: 0.1;
+}
+
+/* Bright scenes share dark typography and warm-white surfaces. */
+.morning,
+.day,
+.evening {
+    --text-color: hsl(220, 35%, 20%);
+    --text-color-muted: hsla(220, 35%, 20%, 0.58);
+    --text-shadow: 0 1px 3px rgba(255, 255, 255, 0.4);
+    --time-shadow:
+        0 1px 3px rgba(255, 255, 255, 0.5),
+        0 0 24px rgba(255, 255, 255, 0.35);
+    --placeholder-color: var(--text-color-muted);
+
+    --component-bg: rgba(255, 255, 255, 0.4);
+    --component-bg-hover: rgba(255, 255, 255, 0.5);
+    --component-bg-focus: rgba(255, 255, 255, 0.6);
+    --component-border: rgba(28, 38, 62, 0.12);
+    --component-border-hover: rgba(28, 38, 62, 0.2);
+    --component-border-focus: rgba(28, 38, 62, 0.35);
+    --component-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    --component-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --component-shadow: var(--component-highlight);
+    --component-shadow-hover:
+        0 4px 12px rgba(38, 54, 82, 0.14),
+        var(--component-highlight-strong);
+    --component-shadow-focus:
+        0 8px 24px rgba(38, 54, 82, 0.18),
+        0 0 0 3px rgba(28, 38, 62, 0.12),
+        var(--component-highlight-strong);
+
+    --clock-border: rgba(28, 38, 62, 0.14);
+    --clock-divider: rgba(28, 38, 62, 0.13);
+    --clock-shadow:
+        0 18px 42px rgba(38, 54, 82, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.75);
+
+    --overlay-bg: rgba(17, 26, 45, 0.38);
+    --dialog-bg: rgba(255, 252, 246, 0.92);
+    --dialog-border: rgba(28, 38, 62, 0.14);
+    --dialog-shadow: 0 12px 36px rgba(38, 54, 82, 0.2);
+    --field-bg: rgba(255, 255, 255, 0.62);
+    --field-border: rgba(28, 38, 62, 0.16);
+    --field-border-focus: rgba(28, 38, 62, 0.4);
+    --field-focus-ring: 0 0 0 3px rgba(28, 38, 62, 0.1);
 }
