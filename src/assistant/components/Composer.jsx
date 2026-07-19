@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 import { Icon } from '../../shared/Icon.jsx';
 import './Composer.css';
@@ -15,12 +15,6 @@ export function Composer({
     inputRef
 }) {
     const fileInputRef = useRef(null);
-
-    useLayoutEffect(() => {
-        const textarea = inputRef.current;
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
-    }, [input, inputRef]);
 
     const handleAttachmentChange = (event) => {
         onAddAttachments(Array.from(event.target.files));
@@ -45,7 +39,7 @@ export function Composer({
         onSend();
     };
 
-    const attachmentTitle = attachments.length === 0
+    const attachmentTitle = !attachments.length
         ? '点击此处上传图片'
         : `已上传 ${attachments.length} 张图片`;
 
@@ -54,7 +48,6 @@ export function Composer({
             <input
                 ref={fileInputRef}
                 type="file"
-                id="assistant-attachment-input"
                 accept="image/*"
                 multiple
                 hidden
@@ -64,7 +57,7 @@ export function Composer({
             <button
                 type="button"
                 id="assistant-attachment-button"
-                className={attachments.length > 0 ? 'has-attachments' : undefined}
+                className={attachments.length ? 'has-attachments' : undefined}
                 title={attachmentTitle}
                 aria-label={attachmentTitle}
                 disabled={isStreaming}
@@ -74,34 +67,30 @@ export function Composer({
             </button>
             <div id="assistant-composer-content">
                 <div id="assistant-attachments">
-                    {attachments.map((attachment, index) => {
-                        const label = attachment.filename;
-                        return (
-                            <div
-                                key={`${attachment.url.slice(0, 48)}-${label}-${index}`}
-                                className="assistant-attachment"
-                                title={attachment.filename}
+                    {attachments.map((attachment, index) => (
+                        <div
+                            key={index}
+                            className="assistant-attachment"
+                            title={attachment.filename}
+                        >
+                            <img src={attachment.url} alt={attachment.filename} />
+                            <button
+                                type="button"
+                                className="assistant-attachment-remove-button"
+                                title="移除图片"
+                                aria-label={`移除第 ${index + 1} 张图片`}
+                                disabled={isStreaming}
+                                onClick={() => onRemoveAttachment(index)}
                             >
-                                <img src={attachment.url} alt={label} />
-                                <button
-                                    type="button"
-                                    className="assistant-attachment-remove-button"
-                                    title="移除图片"
-                                    aria-label={`移除第 ${index + 1} 张图片`}
-                                    disabled={isStreaming}
-                                    onClick={() => onRemoveAttachment(index)}
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        );
-                    })}
+                                ×
+                            </button>
+                        </div>
+                    ))}
                 </div>
                 <textarea
                     ref={inputRef}
                     id="assistant-input"
                     placeholder="输入消息..."
-                    rows={1}
                     value={input}
                     disabled={isStreaming}
                     onChange={(event) => setInput(event.target.value)}
@@ -123,7 +112,7 @@ export function Composer({
                 <button
                     type="button"
                     id="assistant-send-button"
-                    className={input.trim().length > 0 ? 'has-text' : undefined}
+                    className={input.trim() ? 'has-text' : undefined}
                     title="发送"
                     aria-label="发送"
                     onClick={onSend}

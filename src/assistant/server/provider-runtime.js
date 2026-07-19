@@ -44,89 +44,128 @@ function buildProviderOptions(providerConfig) {
     return undefined;
 }
 
-export async function createProviderRuntime(providerConfig, arkConversation) {
+async function createOpenAIChatRuntime(providerConfig) {
     const providerOptions = buildProviderOptions(providerConfig);
+    const { createOpenAI } = await import('@ai-sdk/openai');
+    const sdkProvider = createOpenAI({
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.apiUrl
+    });
 
-    if (
-        providerConfig.provider === 'openai'
-        || providerConfig.provider === 'openai_responses'
-        || providerConfig.provider === 'ark_responses'
-    ) {
-        const { createOpenAI } = await import('@ai-sdk/openai');
-        const usesArkAdapter = providerConfig.provider === 'ark_responses';
-        const sdkProvider = createOpenAI({
-            apiKey: providerConfig.apiKey,
-            baseURL: providerConfig.apiUrl,
-            name: usesArkAdapter ? 'ark' : 'openai',
-            fetch: usesArkAdapter
-                ? createArkFetch({
-                    providerConfig,
-                    fallbackInput: arkConversation.fallbackInput
-                })
-                : undefined
-        });
+    return {
+        model: sdkProvider.chat(providerConfig.model),
+        providerOptions
+    };
+}
 
-        if (providerConfig.provider === 'openai') {
-            return {
-                model: sdkProvider.chat(providerConfig.model),
-                providerOptions
-            };
-        }
+async function createOpenAIResponsesRuntime(providerConfig) {
+    const providerOptions = buildProviderOptions(providerConfig);
+    const { createOpenAI } = await import('@ai-sdk/openai');
+    const sdkProvider = createOpenAI({
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.apiUrl
+    });
 
-        return {
-            model: sdkProvider.responses(providerConfig.model),
-            providerOptions: usesArkAdapter
-                ? {
-                    openai: {
-                        store: true,
-                        previousResponseId: arkConversation.previousResponseId
-                    }
-                }
-                : providerOptions,
-            tools: providerConfig.searchEnabled
-                ? { web_search: sdkProvider.tools.webSearch({}) }
-                : undefined,
-            usesArkInstructions: usesArkAdapter
-        };
-    }
+    return {
+        model: sdkProvider.responses(providerConfig.model),
+        providerOptions,
+        tools: providerConfig.searchEnabled
+            ? { web_search: sdkProvider.tools.webSearch({}) }
+            : undefined,
+        usesArkInstructions: false
+    };
+}
 
-    if (providerConfig.provider === 'anthropic') {
-        const { createAnthropic } = await import('@ai-sdk/anthropic');
-        const sdkProvider = createAnthropic({
-            apiKey: providerConfig.apiKey,
-            baseURL: providerConfig.apiUrl
-        });
-        return {
-            model: sdkProvider(providerConfig.model),
-            providerOptions,
-            tools: providerConfig.searchEnabled
-                ? { web_search: sdkProvider.tools.webSearch_20250305({}) }
-                : undefined
-        };
-    }
+async function createArkResponsesRuntime(providerConfig, arkConversation) {
+    const { createOpenAI } = await import('@ai-sdk/openai');
+    const sdkProvider = createOpenAI({
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.apiUrl,
+        name: 'ark',
+        fetch: createArkFetch({
+            providerConfig,
+            fallbackInput: arkConversation.fallbackInput
+        })
+    });
 
-    if (providerConfig.provider === 'gemini') {
-        const { createGoogle } = await import('@ai-sdk/google');
-        const sdkProvider = createGoogle({
-            apiKey: providerConfig.apiKey,
-            baseURL: providerConfig.apiUrl
-        });
-        return {
-            model: sdkProvider(providerConfig.model),
-            providerOptions,
-            tools: providerConfig.searchEnabled
-                ? { google_search: sdkProvider.tools.googleSearch({}) }
-                : undefined
-        };
-    }
+    return {
+        model: sdkProvider.responses(providerConfig.model),
+        providerOptions: {
+            openai: {
+                store: true,
+                previousResponseId: arkConversation.previousResponseId
+            }
+        },
+        tools: providerConfig.searchEnabled
+            ? { web_search: sdkProvider.tools.webSearch({}) }
+            : undefined,
+        usesArkInstructions: true
+    };
+}
 
+async function createAnthropicRuntime(providerConfig) {
+    const providerOptions = buildProviderOptions(providerConfig);
+    const { createAnthropic } = await import('@ai-sdk/anthropic');
+    const sdkProvider = createAnthropic({
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.apiUrl
+    });
+
+    return {
+        model: sdkProvider(providerConfig.model),
+        providerOptions,
+        tools: providerConfig.searchEnabled
+            ? { web_search: sdkProvider.tools.webSearch_20250305({}) }
+            : undefined
+    };
+}
+
+async function createGeminiRuntime(providerConfig) {
+    const providerOptions = buildProviderOptions(providerConfig);
+    const { createGoogle } = await import('@ai-sdk/google');
+    const sdkProvider = createGoogle({
+        apiKey: providerConfig.apiKey,
+        baseURL: providerConfig.apiUrl
+    });
+
+    return {
+        model: sdkProvider(providerConfig.model),
+        providerOptions,
+        tools: providerConfig.searchEnabled
+            ? { google_search: sdkProvider.tools.googleSearch({}) }
+            : undefined
+    };
+}
+
+async function createDeepSeekRuntime(providerConfig) {
+    const providerOptions = buildProviderOptions(providerConfig);
     const { createDeepSeek } = await import('@ai-sdk/deepseek');
     const sdkProvider = createDeepSeek({
         apiKey: providerConfig.apiKey,
         baseURL: providerConfig.apiUrl
     });
+
     return {
         model: sdkProvider(providerConfig.model),
         providerOptions
     };
+}
+
+const PROVIDER_RUNTIME_FACTORIES = new Map([
+    ['gemini', createGeminiRuntime],
+    ['openai', createOpenAIChatRuntime],
+    ['openai_responses', createOpenAIResponsesRuntime],
+    ['deepseek', createDeepSeekRuntime],
+    ['ark_responses', createArkResponsesRuntime],
+    ['anthropic', createAnthropicRuntime]
+]);
+
+export async function createProviderRuntime(providerConfig, arkConversation) {
+    const runtimeFactory = PROVIDER_RUNTIME_FACTORIES.get(providerConfig.provider);
+
+    if (!runtimeFactory) {
+        throw new Error(`未注册的服务商 "${providerConfig.provider}"。`);
+    }
+
+    return runtimeFactory(providerConfig, arkConversation);
 }

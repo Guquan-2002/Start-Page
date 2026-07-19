@@ -94,6 +94,7 @@ export function PageTheme() {
 
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
         let frameId;
         let resizeTimerId = null;
@@ -140,6 +141,18 @@ export function PageTheme() {
             frameId = window.requestAnimationFrame(render);
         };
 
+        const drawStatic = () => {
+            context.clearRect(0, 0, viewportWidth, viewportHeight);
+            stars.forEach((star) => {
+                context.globalAlpha = star.alpha;
+                context.fillStyle = '#fff';
+                context.beginPath();
+                context.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+                context.fill();
+            });
+            context.globalAlpha = 1;
+        };
+
         const handleResize = () => {
             if (resizeTimerId !== null) {
                 window.clearTimeout(resizeTimerId);
@@ -147,12 +160,17 @@ export function PageTheme() {
             resizeTimerId = window.setTimeout(() => {
                 resizeTimerId = null;
                 resizeCanvas();
+                if (reducedMotion) drawStatic();
             }, 200);
         };
 
         resizeCanvas();
         window.addEventListener('resize', handleResize);
-        frameId = window.requestAnimationFrame(render);
+        if (reducedMotion) {
+            drawStatic();
+        } else {
+            frameId = window.requestAnimationFrame(render);
+        }
 
         return () => {
             window.removeEventListener('resize', handleResize);

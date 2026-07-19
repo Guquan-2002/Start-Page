@@ -5,6 +5,23 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+
+    &::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 }
 
 @keyframes assistant-message-appear {
@@ -17,23 +34,6 @@
     50% { opacity: 0.62; }
 }
 
-#assistant-messages::-webkit-scrollbar {
-    width: 5px;
-}
-
-#assistant-messages::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#assistant-messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-}
-
-#assistant-messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
-
 #assistant-empty-state {
     display: flex;
     flex-direction: column;
@@ -44,15 +44,15 @@
     opacity: 0.35;
     pointer-events: none;
     user-select: none;
-}
 
-#assistant-empty-state .icon {
-    font-size: 2.2rem;
-}
+    .icon {
+        font-size: 2.2rem;
+    }
 
-#assistant-empty-state span {
-    font-size: 0.88rem;
-    letter-spacing: 0.02em;
+    span {
+        font-size: 0.88rem;
+        letter-spacing: 0.02em;
+    }
 }
 
 .assistant-message {
@@ -61,61 +61,61 @@
     padding: 10px 14px;
     font-size: 0.9rem;
     line-height: 1.5;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    overflow-wrap: anywhere;
     text-shadow: none;
     animation: assistant-message-appear 0.25s ease-out;
-}
 
-.assistant-message.user {
-    align-self: flex-end;
-    white-space: pre-wrap;
-    background: rgba(100, 140, 255, 0.35);
-    border-bottom-right-radius: 4px;
-    box-shadow: 0 2px 8px rgba(100, 140, 255, 0.15);
-}
+    &.user {
+        align-self: flex-end;
+        white-space: pre-wrap;
+        background: rgba(100, 140, 255, 0.35);
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 2px 8px rgba(100, 140, 255, 0.15);
+    }
 
-.assistant-message.assistant {
-    position: relative;
-    align-self: flex-start;
-    background: rgba(255, 255, 255, 0.1);
-    border-bottom-left-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    overflow-wrap: anywhere;
-}
+    &.assistant {
+        position: relative;
+        align-self: flex-start;
+        background: rgba(255, 255, 255, 0.1);
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
 
-.assistant-message.error {
-    align-self: center;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    background: rgba(255, 60, 60, 0.25);
-}
+    &.error {
+        align-self: center;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        background: rgba(255, 60, 60, 0.25);
+    }
 
-.assistant-message.error .assistant-error-title {
-    font-weight: 600;
-}
+    &.error .assistant-error-title {
+        font-weight: 600;
+    }
 
-.assistant-message.error .assistant-error-detail {
-    margin-top: 4px;
-    opacity: 0.85;
-    font-size: 0.76rem;
-    white-space: pre-line;
-    word-break: break-word;
-}
+    &.error .assistant-error-detail {
+        margin-top: 4px;
+        opacity: 0.85;
+        font-size: 0.76rem;
+        white-space: pre-line;
+    }
 
-.assistant-message.assistant.is-streaming {
-    white-space: pre-wrap;
-}
+    &.assistant.is-streaming {
+        white-space: pre-wrap;
+    }
 
-.assistant-message.assistant.is-streaming-placeholder {
-    opacity: 0.82;
-    animation-name: assistant-message-appear, assistant-typing-blink;
-    animation-duration: 0.25s, 1.8s;
-    animation-timing-function: ease-out, ease-in-out;
-    animation-iteration-count: 1, infinite;
-    animation-fill-mode: both, both;
-    animation-delay: 0ms, 250ms;
+    &.assistant.is-streaming-placeholder {
+        opacity: 0.82;
+        animation-name: assistant-message-appear, assistant-typing-blink;
+        animation-duration: 0.25s, 1.8s;
+        animation-timing-function: ease-out, ease-in-out;
+        animation-iteration-count: 1, infinite;
+        animation-fill-mode: both, both;
+        animation-delay: 0ms, 250ms;
+    }
+
+    &.assistant:hover .assistant-regenerate-button {
+        opacity: 1;
+    }
 }
 
 .assistant-message-attachments {
@@ -135,7 +135,6 @@
 
 .assistant-file-link {
     color: inherit;
-    overflow-wrap: anywhere;
 }
 
 .assistant-source-link {
@@ -150,11 +149,11 @@
     border-left: 2px solid rgba(255, 255, 255, 0.2);
     padding-left: 8px;
     opacity: 0.72;
-}
 
-.assistant-reasoning summary {
-    cursor: pointer;
-    font-size: 0.78rem;
+    summary {
+        cursor: pointer;
+        font-size: 0.78rem;
+    }
 }
 
 .assistant-regenerate-button {
@@ -170,33 +169,28 @@
     cursor: pointer;
     opacity: 0;
     transition: background 0.2s, color 0.2s, opacity 0.2s, transform 0.2s;
-}
 
-.assistant-message.assistant:hover .assistant-regenerate-button {
-    opacity: 1;
-}
-
-.assistant-regenerate-button:hover {
-    background: rgba(100, 140, 255, 0.3);
-    color: #fff;
-    transform: scale(1.05);
+    &:hover {
+        background: rgba(100, 140, 255, 0.3);
+        color: #fff;
+        transform: scale(1.05);
+    }
 }
 
 @media (max-width: 768px) {
     #assistant-messages {
         padding: clamp(10px, 3vw, 12px);
         gap: clamp(8px, 2.5vw, 10px);
-    }
 
-    #assistant-messages::-webkit-scrollbar {
-        width: 2px;
+        &::-webkit-scrollbar {
+            width: 2px;
+        }
     }
 
     .assistant-message {
         max-width: 95%;
         font-size: clamp(0.9rem, 3.8vw, 0.95rem);
         padding: clamp(10px, 3vw, 12px) clamp(12px, 3.8vw, 14px);
-        overflow-wrap: anywhere;
     }
 
     .assistant-regenerate-button {

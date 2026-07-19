@@ -49,7 +49,7 @@ export function useSettings() {
     const setSystemPrompt = (systemPrompt) => {
         setSettings((currentSettings) => ({
             ...currentSettings,
-            systemPrompt: systemPrompt.trim()
+            systemPrompt
         }));
     };
 

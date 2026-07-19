@@ -17,6 +17,7 @@ const PANEL_MODE = {
 export function Assistant() {
     const [panelMode, setPanelMode] = useState(PANEL_MODE.closed);
     const toggleRef = useRef(null);
+    const panelRef = useRef(null);
     const settingsButtonRef = useRef(null);
     const previousPanelModeRef = useRef(panelMode);
     const settings = useSettings();
@@ -53,6 +54,34 @@ export function Assistant() {
         return () => cancelAnimationFrame(frameId);
     }, [panelMode]);
 
+    const handlePanelKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            // 设置弹窗是原生 dialog，Esc 由其 onCancel 处理
+            if (!isSettingsOpen) setPanelMode(PANEL_MODE.closed);
+            return;
+        }
+
+        if (event.key !== 'Tab' || isSettingsOpen) return;
+
+        const focusableElements = Array.from(panelRef.current.querySelectorAll(
+            'button:not(:disabled), input:not(:disabled), select:not(:disabled), '
+            + 'textarea:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])'
+        )).filter((element) => element.offsetParent !== null);
+
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (event.shiftKey && document.activeElement === firstElement) {
+            event.preventDefault();
+            lastElement.focus();
+        } else if (!event.shiftKey && document.activeElement === lastElement) {
+            event.preventDefault();
+            firstElement.focus();
+        }
+    };
+
     return (
         <>
             <button
@@ -70,10 +99,12 @@ export function Assistant() {
 
             <div
                 id="assistant-panel"
+                ref={panelRef}
                 className={isPanelOpen ? undefined : 'assistant-hidden'}
                 role="dialog"
                 aria-label="AI 助手"
                 aria-hidden={!isPanelOpen}
+                onKeyDown={handlePanelKeyDown}
             >
                 <div id="assistant-header">
                     <span id="assistant-title">AI 助手</span>

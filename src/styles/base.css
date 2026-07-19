@@ -8,6 +8,11 @@
     to { background-position: 100% 100%; }
 }
 
+@keyframes fade-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+}
+
 @keyframes glow-drift {
     25% { transform: translate(5%, -2%) scale(1.0); }
     50% { transform: translate(0%, 5%) scale(1.05); }
@@ -18,12 +23,19 @@
 body {
     font-family: "霞鹜文楷 GB 屏幕阅读版";
     color: var(--text-color);
-    text-shadow: var(--text-shadow);
     overflow: hidden;
-    background: var(--current-theme-gradient);
+    background: linear-gradient(
+        var(--theme-angle),
+        var(--theme-c1) var(--theme-p1, 0%),
+        var(--theme-c2) var(--theme-p2, 33.33%),
+        var(--theme-c3) var(--theme-p3, 66.67%),
+        var(--theme-c4) var(--theme-p4, 100%)
+    );
     background-size: 400% 400%;
-    transition: background 2s ease-in-out;
-    animation: gradient-flow 8s ease-in-out infinite alternate;
+    transition: --theme-angle 2s ease-in-out, --theme-c1 2s ease-in-out,
+        --theme-c2 2s ease-in-out, --theme-c3 2s ease-in-out,
+        --theme-c4 2s ease-in-out;
+    animation: gradient-flow 24s ease-in-out infinite alternate;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -52,7 +64,7 @@ body::before {
         radial-gradient(ellipse at 30% 70%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.5)) 0%, transparent 40%),
         radial-gradient(ellipse at 70% 30%, rgba(255, 255, 255, calc(var(--glow-intensity) * 0.3)) 0%, transparent 30%);
     opacity: 0.8;
-    animation: glow-drift 4s linear infinite alternate;
+    animation: glow-drift 16s linear infinite alternate;
     mix-blend-mode: soft-light;
     will-change: transform;
 }
@@ -61,7 +73,7 @@ body::before {
     body {
         overflow-x: hidden;
         overflow-y: auto;
-        animation-duration: 12s;
+        animation-duration: 32s;
     }
 
     body::before {
@@ -96,5 +108,28 @@ body::before {
     a,
     input[type="checkbox"] {
         min-height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body {
+        animation: none;
+        transition: none;
+    }
+
+    body::before {
+        animation: none;
+    }
+
+    #time-container,
+    #weather-container,
+    #search-container,
+    #network-status {
+        animation: none;
+    }
+
+    .stars-bg::before,
+    .stars-bg::after {
+        animation: none;
     }
 }

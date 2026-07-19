@@ -1,106 +1,94 @@
-.assistant-message.assistant p {
-    margin: 0.4em 0;
-    overflow-wrap: break-word;
-}
+.assistant-message.assistant {
+    p {
+        margin: 0.4em 0;
+    }
 
-.assistant-message.assistant p:first-child {
-    margin-top: 0;
-}
+    p:first-child {
+        margin-top: 0;
+    }
 
-.assistant-message.assistant p:last-child {
-    margin-bottom: 0;
-}
+    p:last-child {
+        margin-bottom: 0;
+    }
 
-.assistant-message.assistant ul,
-.assistant-message.assistant ol {
-    margin: 0.4em 0;
-    padding-left: 1.5em;
-    word-wrap: break-word;
-}
+    :is(ul, ol) {
+        margin: 0.4em 0;
+        padding-left: 1.5em;
+    }
 
-.assistant-message.assistant li {
-    margin: 0.2em 0;
-    word-wrap: break-word;
-}
+    li {
+        margin: 0.2em 0;
+    }
 
-.assistant-message.assistant blockquote {
-    margin: 0.4em 0;
-    border-left: 3px solid rgba(255, 255, 255, 0.3);
-    padding: 0.2em 0.8em;
-    opacity: 0.85;
-    overflow-wrap: break-word;
-}
+    blockquote {
+        margin: 0.4em 0;
+        border-left: 3px solid rgba(255, 255, 255, 0.3);
+        padding: 0.2em 0.8em;
+        opacity: 0.85;
+    }
 
-.assistant-message.assistant table {
-    display: block;
-    max-width: 100%;
-    margin: 0.4em 0;
-    border-collapse: collapse;
-    overflow-x: auto;
-    font-size: 0.85em;
-}
+    table {
+        display: block;
+        max-width: 100%;
+        margin: 0.4em 0;
+        border-collapse: collapse;
+        overflow-x: auto;
+        font-size: 0.85em;
+    }
 
-.assistant-message.assistant th,
-.assistant-message.assistant td {
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    padding: 4px 8px;
-    word-break: break-word;
-}
+    :is(th, td) {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 4px 8px;
+    }
 
-.assistant-message.assistant a {
-    color: #7eb8ff;
-    text-decoration: underline;
-    word-break: break-all;
-    overflow-wrap: anywhere;
-}
+    a {
+        color: #7eb8ff;
+        text-decoration: underline;
+        word-break: break-all;
+    }
 
-.assistant-message.assistant h1,
-.assistant-message.assistant h2,
-.assistant-message.assistant h3,
-.assistant-message.assistant h4,
-.assistant-message.assistant h5,
-.assistant-message.assistant h6 {
-    margin: 0.5em 0 0.3em;
-    font-size: 0.95em;
-    font-weight: 600;
-    word-wrap: break-word;
-}
+    :is(h1, h2, h3, h4, h5, h6) {
+        margin: 0.5em 0 0.3em;
+        font-size: 0.95em;
+        font-weight: 600;
+    }
 
-.assistant-message.assistant hr {
-    margin: 0.6em 0;
-    border: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
-}
+    hr {
+        margin: 0.6em 0;
+        border: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+    }
 
-.assistant-message.assistant pre {
-    max-width: 100%;
-    margin: 0.5em 0;
-    border-radius: 8px;
-    padding: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    background: rgba(0, 0, 0, 0.35);
-}
+    pre {
+        max-width: 100%;
+        margin: 0.5em 0;
+        border-radius: 8px;
+        padding: 12px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        background: rgba(0, 0, 0, 0.35);
+    }
 
-.assistant-message.assistant pre code {
-    display: block;
-    padding: 0;
-    overflow-wrap: normal;
-    background: none !important;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.82rem;
-    line-height: 1.45;
-    white-space: pre;
-}
+    code {
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    }
 
-.assistant-message.assistant code:not(pre code) {
-    border-radius: 4px;
-    padding: 2px 5px;
-    background: rgba(255, 255, 255, 0.1);
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.85em;
-    word-break: break-all;
-    overflow-wrap: anywhere;
+    pre code {
+        display: block;
+        padding: 0;
+        overflow-wrap: normal;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        white-space: pre;
+    }
+
+    code:not(pre code) {
+        border-radius: 4px;
+        padding: 2px 5px;
+        background: rgba(255, 255, 255, 0.1);
+        font-size: 0.85em;
+        word-break: break-all;
+    }
 }
 
 @media (max-width: 768px) {
@@ -109,7 +97,6 @@
         margin: 0.5em -4px;
         border-radius: 6px;
         padding: 10px;
-        font-size: 0.8rem;
     }
 
     .assistant-message.assistant pre code {

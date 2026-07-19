@@ -1,10 +1,34 @@
-:root {
-    --morning-gradient: linear-gradient(-45deg, hsl(40, 100%, 70%), hsl(20, 70%, 70%), hsl(60, 70%, 70%), hsl(40, 50%, 90%));
-    --day-gradient: linear-gradient(-135deg, hsl(200, 100%, 70%), hsl(220, 70%, 70%), hsl(200, 70%, 70%), hsl(200, 70%, 70%));
-    --evening-gradient: linear-gradient(-45deg, hsl(300, 50%, 50%), hsl(330, 50%, 50%), hsl(270, 50%, 50%), hsl(300, 70%, 70%));
-    --night-gradient: linear-gradient(-135deg, hsl(200, 0%, 30%), hsl(180, 30%, 30%), hsl(220, 20%, 30%), hsl(200, 30%, 30%));
+@property --theme-angle {
+    syntax: '<angle>';
+    inherits: true;
+    initial-value: -135deg;
+}
 
-    --current-theme-gradient: var(--night-gradient);
+@property --theme-c1 {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: hsl(200, 0%, 30%);
+}
+
+@property --theme-c2 {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: hsl(180, 30%, 30%);
+}
+
+@property --theme-c3 {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: hsl(220, 20%, 30%);
+}
+
+@property --theme-c4 {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: hsl(200, 30%, 30%);
+}
+
+:root {
     --glow-intensity: 0.1;
 
     --text-color: white;
@@ -12,7 +36,9 @@
     --placeholder-color: rgba(255, 255, 255, 0.7);
     --component-bg: rgba(255, 255, 255, 0.1);
     --component-bg-focus: rgba(255, 255, 255, 0.25);
-    --component-shadow-focus: 0 0 15px rgba(0, 0, 0, 0.2);
+    --component-shadow-focus: 0 8px 24px rgba(0, 0, 0, 0.25);
+    --component-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    --component-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 
     --assistant-panel-bg: rgba(20, 20, 30, 0.85);
     --assistant-overlay-bg-start: rgba(16, 22, 34, 0.97);
@@ -32,21 +58,39 @@
 }
 
 .morning {
-    --current-theme-gradient: var(--morning-gradient);
+    --theme-angle: -45deg;
+    --theme-c1: hsl(40, 100%, 70%);
+    --theme-c2: hsl(20, 70%, 70%);
+    --theme-c3: hsl(60, 70%, 70%);
+    --theme-c4: hsl(40, 50%, 90%);
     --glow-intensity: 0.25;
 }
 
 .day {
-    --current-theme-gradient: var(--day-gradient);
+    --theme-angle: -135deg;
+    --theme-c1: hsl(200, 100%, 70%);
+    --theme-c2: hsl(220, 70%, 70%);
+    --theme-c3: hsl(200, 70%, 70%);
+    --theme-c4: hsl(200, 70%, 70%);
+    --theme-p2: 50%;
+    --theme-p3: 100%;
     --glow-intensity: 0.15;
 }
 
 .evening {
-    --current-theme-gradient: var(--evening-gradient);
+    --theme-angle: -45deg;
+    --theme-c1: hsl(300, 50%, 50%);
+    --theme-c2: hsl(330, 50%, 50%);
+    --theme-c3: hsl(270, 50%, 50%);
+    --theme-c4: hsl(300, 70%, 70%);
     --glow-intensity: 0.20;
 }
 
 .night {
-    --current-theme-gradient: var(--night-gradient);
+    --theme-angle: -135deg;
+    --theme-c1: hsl(200, 0%, 30%);
+    --theme-c2: hsl(180, 30%, 30%);
+    --theme-c3: hsl(220, 20%, 30%);
+    --theme-c4: hsl(200, 30%, 30%);
     --glow-intensity: 0.10;
 }

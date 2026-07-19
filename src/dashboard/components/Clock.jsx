@@ -28,7 +28,7 @@ export function Clock() {
     const clock = formatClock(now);
 
     return (
-        <div id="time-container" role="timer" aria-label="Current time">
+        <div id="time-container" aria-label="Current time">
             <div id="time">{clock.time}</div>
             <div id="date">{clock.date}</div>
         </div>

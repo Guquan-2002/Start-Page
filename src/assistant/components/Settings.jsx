@@ -21,17 +21,14 @@ export function Settings({
     }, [isOpen]);
 
     const {
-        values: settingsValues,
+        values,
         activeProfile,
         providers,
-        providerPresentation,
+        providerPresentation: { reasoning, search, placeholders },
         setProvider,
         updateProfile,
         setSystemPrompt
     } = settings;
-    const reasoningOptions = providerPresentation.reasoning;
-    const searchOptions = providerPresentation.search;
-    const placeholders = providerPresentation.placeholders;
 
     const handleCancel = (event) => {
         event.preventDefault();
@@ -50,7 +47,7 @@ export function Settings({
                     <div className="assistant-settings-title-group">
                         <span id="assistant-settings-title" className="assistant-settings-title">AI 设置</span>
                         <small className="assistant-settings-subtitle">
-                           配置服务商、API 地址、密钥、模型、提示词及其他选项。
+                            配置服务商、API 地址、密钥、模型、提示词及其他选项。
                         </small>
                     </div>
                     <button
@@ -65,12 +62,11 @@ export function Settings({
                 </div>
 
                 <div className="assistant-settings-content">
-                    <label htmlFor="assistant-settings-provider">
+                    <label>
                         服务商
                         <select
-                            id="assistant-settings-provider"
                             autoFocus
-                            value={settingsValues.provider}
+                            value={values.provider}
                             onChange={(event) => setProvider(event.target.value)}
                         >
                             {providers.map((provider) => (
@@ -81,10 +77,9 @@ export function Settings({
                         </select>
                     </label>
 
-                    <label htmlFor="assistant-settings-api-url">
+                    <label>
                         API 地址
                         <input
-                            id="assistant-settings-api-url"
                             type="text"
                             value={activeProfile.apiUrl}
                             placeholder={placeholders.apiUrl}
@@ -93,10 +88,9 @@ export function Settings({
                         />
                     </label>
 
-                    <label htmlFor="assistant-settings-api-key">
+                    <label>
                         API 密钥
                         <input
-                            id="assistant-settings-api-key"
                             type="password"
                             value={activeProfile.apiKey}
                             placeholder={placeholders.apiKey}
@@ -105,10 +99,9 @@ export function Settings({
                         />
                     </label>
 
-                    <label htmlFor="assistant-settings-model">
+                    <label>
                         模型
                         <input
-                            id="assistant-settings-model"
                             type="text"
                             value={activeProfile.model}
                             placeholder={placeholders.model}
@@ -117,53 +110,55 @@ export function Settings({
                         />
                     </label>
 
-                    <label htmlFor="assistant-settings-system-prompt">
+                    <label>
                         系统提示词
                         <textarea
-                            id="assistant-settings-system-prompt"
-                            rows={3}
-                            value={settingsValues.systemPrompt}
+                            value={values.systemPrompt}
                             placeholder="你是一个有帮助的助手。"
                             onChange={(event) => setSystemPrompt(event.target.value)}
                         />
                     </label>
 
-                    <label htmlFor="assistant-settings-thinking-level">
-                        <span id="assistant-settings-thinking-label">{reasoningOptions.label}</span>
-                        <select
-                            id="assistant-settings-thinking-level"
-                            value={activeProfile.reasoning}
-                            onChange={(event) => updateProfile('reasoning', event.target.value)}
+                    <div className="assistant-settings-field">
+                        <label>
+                            <span>{reasoning.label}</span>
+                            <select
+                                value={activeProfile.reasoning}
+                                aria-describedby="assistant-settings-reasoning-note"
+                                onChange={(event) => updateProfile('reasoning', event.target.value)}
+                            >
+                                <option value="">自动</option>
+                                {reasoning.options.map((value) => (
+                                    <option key={value} value={value}>{value}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <small
+                            id="assistant-settings-reasoning-note"
+                            className="assistant-settings-note"
                         >
-                            <option value="">自动</option>
-                            {reasoningOptions.options.map((value) => (
-                                <option key={value} value={value}>{value}</option>
-                            ))}
-                        </select>
-                        <small id="assistant-settings-thinking-note" className="assistant-settings-note">
-                            {reasoningOptions.note}
+                            {reasoning.note}
                         </small>
-                    </label>
+                    </div>
 
                     <div className="assistant-settings-section">
-                        <span id="assistant-settings-search-label" className="assistant-settings-section-title">
-                            {searchOptions.label}
+                        <span className="assistant-settings-section-title">
+                            {search.label}
                         </span>
-                        <label className="assistant-settings-toggle" htmlFor="assistant-settings-search-enabled">
+                        <label className="assistant-settings-toggle">
                             <input
-                                id="assistant-settings-search-enabled"
                                 type="checkbox"
                                 checked={activeProfile.searchEnabled}
-                                disabled={searchOptions.supported === false}
+                                disabled={search.supported === false}
+                                aria-describedby="assistant-settings-search-note"
                                 onChange={(event) => updateProfile('searchEnabled', event.target.checked)}
                             />
                             <span>启用网络搜索</span>
                         </label>
                         <small id="assistant-settings-search-note" className="assistant-settings-note">
-                            {searchOptions.note}
+                            {search.note}
                         </small>
                     </div>
-
                 </div>
             </div>
         </dialog>

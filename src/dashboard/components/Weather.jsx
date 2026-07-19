@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '../../shared/Icon.jsx';
 import './Weather.css';
 
@@ -74,76 +74,86 @@ function promptWeatherSetupIfNeeded() {
     return true;
 }
 
-export function Weather({ networkEngine }) {
+export function Weather({ networkEngine, networkCheckedAt }) {
     const [weather, setWeather] = useState(INITIAL_WEATHER);
+    const [weatherFailed, setWeatherFailed] = useState(false);
+    const disposedRef = useRef(false);
+
+    useEffect(() => () => {
+        disposedRef.current = true;
+    }, []);
+
+    const runWeatherCheck = useCallback(async () => {
+        const apiUrl = networkEngine === 'google'
+            ? WEATHER_API_URLS.googleAvailable
+            : WEATHER_API_URLS.default;
+
+        if (!apiUrl) {
+            setWeather({
+                icon: 'key',
+                spinning: false,
+                details: '未配置天气服务'
+            });
+            return;
+        }
+
+        setWeather({
+            icon: 'spinner',
+            spinning: true,
+            details: '正在获取天气...'
+        });
+
+        try {
+            const response = await fetch(apiUrl, {
+                signal: AbortSignal.timeout(WEATHER_REQUEST_TIMEOUT_MS)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            const { location, now } = data.results[0];
+            if (disposedRef.current) return;
+
+            setWeatherFailed(false);
+            setWeather({
+                icon: WEATHER_ICONS[now.code],
+                spinning: false,
+                details: `${location.name} · ${now.text} ${now.temperature}°C`
+            });
+        } catch (error) {
+            if (disposedRef.current) return;
+
+            console.error('获取失败:', error);
+            setWeatherFailed(true);
+            setWeather({
+                icon: 'warning',
+                spinning: false,
+                details: '获取失败'
+            });
+        }
+    }, [networkEngine]);
 
     useEffect(() => {
         if (promptWeatherSetupIfNeeded() || networkEngine === null) {
             return;
         }
 
-        let disposed = false;
-
-        const updateWeather = async (url) => {
-            if (!url) {
-                setWeather({
-                    icon: 'key',
-                    spinning: false,
-                    details: '未配置天气服务'
-                });
-                return;
-            }
-
-            try {
-                const response = await fetch(url, {
-                    signal: AbortSignal.timeout(WEATHER_REQUEST_TIMEOUT_MS)
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-                const data = await response.json();
-                const { location, now } = data.results[0];
-                if (!disposed) {
-                    setWeather({
-                        icon: WEATHER_ICONS[now.code],
-                        spinning: false,
-                        details: `${location.name} · ${now.text} ${now.temperature}°C`
-                    });
-                }
-            } catch (error) {
-                if (disposed) return;
-
-                console.error('获取失败:', error);
-                setWeather({
-                    icon: 'warning',
-                    spinning: false,
-                    details: '获取失败'
-                });
-            }
-        };
-
-        const runWeatherCheck = () => {
-            setWeather({
-                icon: 'spinner',
-                spinning: true,
-                details: '正在获取天气...'
-            });
-
-            const apiUrl = networkEngine === 'google'
-                ? WEATHER_API_URLS.googleAvailable
-                : WEATHER_API_URLS.default;
-            return updateWeather(apiUrl);
-        };
-
+        void runWeatherCheck();
         const intervalId = window.setInterval(() => {
             void runWeatherCheck();
         }, WEATHER_UPDATE_INTERVAL);
-        void runWeatherCheck();
 
-        return () => {
-            disposed = true;
-            window.clearInterval(intervalId);
-        };
-    }, [networkEngine]);
+        return () => window.clearInterval(intervalId);
+    }, [networkEngine, runWeatherCheck]);
+
+    useEffect(() => {
+        if (!weatherFailed || !networkEngine || networkEngine === 'offline') {
+            return;
+        }
+
+        void runWeatherCheck();
+        // 仅在轮询节拍变化时评估是否重试
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [networkCheckedAt]);
 
     return (
         <a

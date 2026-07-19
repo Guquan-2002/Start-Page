@@ -1,12 +1,14 @@
 #time-container {
     text-align: center;
     margin-bottom: clamp(1.5rem, 2vw, 2rem);
+    animation: fade-rise 0.6s ease-out backwards;
 }
 
 #time {
     font-size: clamp(6rem, 7vw, 8rem);
     font-weight: 600;
     letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
     text-shadow:
         0 2px 4px rgba(0, 0, 0, 0.3),
         0 0 20px rgba(255, 255, 255, 0.15),
@@ -17,6 +19,7 @@
 #date {
     font-size: clamp(1.4rem, 1.5vw, 1.8rem);
     font-weight: 300;
+    text-shadow: var(--text-shadow);
 }
 
 @media (max-width: 768px) {

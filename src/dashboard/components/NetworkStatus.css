@@ -1,0 +1,46 @@
+#network-status {
+    position: fixed;
+    bottom: clamp(12px, 1.5vw, 15px);
+    left: clamp(15px, 2vw, 20px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
+    background-color: var(--component-bg);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: var(--component-highlight);
+    padding: clamp(5px, 0.8vw, 6px) clamp(12px, 1vw, 14px);
+    border-radius: 999px;
+    z-index: 10;
+    backdrop-filter: blur(10px);
+    animation: fade-rise 0.6s ease-out 0.45s backwards;
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+        transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+#network-status:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15),
+        var(--component-highlight-strong);
+}
+
+#network-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: var(--net-checking);
+    transition: background-color 0.5s ease;
+}
+
+#network-indicator.google-ok { background-color: var(--net-ok-global); }
+#network-indicator.bing-ok { background-color: var(--net-ok-local); }
+#network-indicator.net-fail { background-color: var(--net-fail); }
+
+@media (max-width: 768px) {
+    #network-indicator {
+        width: 9px;
+        height: 9px;
+    }
+}

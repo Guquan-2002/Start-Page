@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { handleProviderApi } from './src/assistant/server/provider-api.js';
-import { handleNetworkStatusApi } from './src/dashboard/server/network-status-api.js';
+import { handleSystemStatusApi } from './src/dashboard/server/system-status-api.js';
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;
@@ -54,7 +54,8 @@ function resolvePath(urlPath) {
 }
 
 const server = createServer(async (request, response) => {
-  if (await handleNetworkStatusApi(request, response)) {
+
+  if (await handleSystemStatusApi(request, response)) {
     return;
   }
 

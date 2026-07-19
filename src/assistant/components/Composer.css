@@ -30,13 +30,13 @@
     overflow: hidden;
     flex-shrink: 0;
     background: rgba(255, 255, 255, 0.08);
-}
 
-.assistant-attachment img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
 }
 
 .assistant-attachment-remove-button {
@@ -57,6 +57,7 @@
 
 #assistant-input {
     width: 100%;
+    field-sizing: content;
     max-height: 120px;
     resize: none;
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -68,21 +69,19 @@
     font-family: inherit;
     line-height: 1.4;
     text-shadow: none;
+
+    &:focus {
+        outline: none;
+        border-color: rgba(100, 140, 255, 0.5);
+        box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.15), 0 0 12px rgba(100, 140, 255, 0.1);
+    }
+
+    &::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
 }
 
-#assistant-input:focus {
-    outline: none;
-    border-color: rgba(100, 140, 255, 0.5);
-    box-shadow: 0 0 0 2px rgba(100, 140, 255, 0.15), 0 0 12px rgba(100, 140, 255, 0.1);
-}
-
-#assistant-input::placeholder {
-    color: rgba(255, 255, 255, 0.4);
-}
-
-#assistant-attachment-button,
-#assistant-send-button,
-#assistant-stop-button {
+:is(#assistant-attachment-button, #assistant-send-button, #assistant-stop-button) {
     width: 38px;
     height: 38px;
     border: none;
@@ -97,36 +96,36 @@
 
 #assistant-send-button {
     background: var(--assistant-accent);
+
+    &:hover {
+        background: var(--assistant-accent-strong);
+    }
+
+    &.has-text {
+        background: var(--assistant-accent-strong);
+        box-shadow: 0 0 12px rgba(100, 140, 255, 0.4);
+        transition: background 0.2s, box-shadow 0.3s;
+    }
 }
 
 #assistant-attachment-button {
     background: rgba(255, 255, 255, 0.12);
-}
 
-#assistant-attachment-button:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
 
-#assistant-attachment-button.has-attachments {
-    background: rgba(65, 146, 255, 0.8);
-}
-
-#assistant-send-button:hover {
-    background: var(--assistant-accent-strong);
-}
-
-#assistant-send-button.has-text {
-    background: var(--assistant-accent-strong);
-    box-shadow: 0 0 12px rgba(100, 140, 255, 0.4);
-    transition: background 0.2s, box-shadow 0.3s;
+    &.has-attachments {
+        background: rgba(65, 146, 255, 0.8);
+    }
 }
 
 #assistant-stop-button {
     background: var(--assistant-danger);
-}
 
-#assistant-stop-button:hover {
-    background: var(--assistant-danger-strong);
+    &:hover {
+        background: var(--assistant-danger-strong);
+    }
 }
 
 @media (max-width: 768px) {
@@ -141,8 +140,7 @@
         border-radius: 14px;
     }
 
-    #assistant-send-button,
-    #assistant-stop-button {
+    :is(#assistant-send-button, #assistant-stop-button) {
         width: clamp(40px, 11vw, 44px);
         height: clamp(40px, 11vw, 44px);
         font-size: clamp(0.9rem, 2.5vw, 1rem);
@@ -156,8 +154,7 @@
 }
 
 @media (hover: none) and (pointer: coarse) {
-    #assistant-send-button:active,
-    #assistant-stop-button:active {
+    :is(#assistant-send-button, #assistant-stop-button):active {
         transform: scale(0.95);
     }
 }
