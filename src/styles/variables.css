@@ -4,25 +4,25 @@
     initial-value: -135deg;
 }
 
-@property --theme-c1 {
+@property --theme-color-1 {
     syntax: '<color>';
     inherits: true;
     initial-value: hsl(200, 0%, 30%);
 }
 
-@property --theme-c2 {
+@property --theme-color-2 {
     syntax: '<color>';
     inherits: true;
     initial-value: hsl(180, 30%, 30%);
 }
 
-@property --theme-c3 {
+@property --theme-color-3 {
     syntax: '<color>';
     inherits: true;
     initial-value: hsl(220, 20%, 30%);
 }
 
-@property --theme-c4 {
+@property --theme-color-4 {
     syntax: '<color>';
     inherits: true;
     initial-value: hsl(200, 30%, 30%);
@@ -114,45 +114,45 @@
     --assistant-danger-strong: rgba(255, 80, 80, 0.6);
 
     /* Network status colors intentionally remain time-theme independent. */
-    --net-ok-global: #66CCFF;
-    --net-ok-cn: #00EE00;
-    --net-fail: #EE0000;
-    --net-checking: #EEEE00;
+    --network-global-color: #66CCFF;
+    --network-domestic-color: #00EE00;
+    --network-offline-color: #EE0000;
+    --network-checking-color: #EEEE00;
 }
 
 .morning {
     --theme-angle: -45deg;
-    --theme-c1: hsl(40, 100%, 70%);
-    --theme-c2: hsl(20, 70%, 70%);
-    --theme-c3: hsl(60, 70%, 70%);
-    --theme-c4: hsl(40, 50%, 90%);
+    --theme-color-1: hsl(40, 100%, 70%);
+    --theme-color-2: hsl(20, 70%, 70%);
+    --theme-color-3: hsl(60, 70%, 70%);
+    --theme-color-4: hsl(40, 50%, 90%);
     --glow-intensity: 0.25;
 }
 
 .day {
     --theme-angle: 180deg;
-    --theme-c1: hsl(208, 85%, 60%);
-    --theme-c2: hsl(202, 80%, 70%);
-    --theme-c3: hsl(196, 70%, 80%);
-    --theme-c4: hsl(48, 65%, 88%);
+    --theme-color-1: hsl(208, 85%, 60%);
+    --theme-color-2: hsl(202, 80%, 70%);
+    --theme-color-3: hsl(196, 70%, 80%);
+    --theme-color-4: hsl(48, 65%, 88%);
     --glow-intensity: 0.15;
 }
 
 .evening {
     --theme-angle: -45deg;
-    --theme-c1: hsl(300, 50%, 50%);
-    --theme-c2: hsl(330, 50%, 50%);
-    --theme-c3: hsl(270, 50%, 50%);
-    --theme-c4: hsl(300, 70%, 70%);
+    --theme-color-1: hsl(300, 50%, 50%);
+    --theme-color-2: hsl(330, 50%, 50%);
+    --theme-color-3: hsl(270, 50%, 50%);
+    --theme-color-4: hsl(300, 70%, 70%);
     --glow-intensity: 0.2;
 }
 
 .night {
     --theme-angle: -135deg;
-    --theme-c1: hsl(200, 0%, 30%);
-    --theme-c2: hsl(180, 30%, 30%);
-    --theme-c3: hsl(220, 20%, 30%);
-    --theme-c4: hsl(200, 30%, 30%);
+    --theme-color-1: hsl(200, 0%, 30%);
+    --theme-color-2: hsl(180, 30%, 30%);
+    --theme-color-3: hsl(220, 20%, 30%);
+    --theme-color-4: hsl(200, 30%, 30%);
     --glow-intensity: 0.1;
 }
 

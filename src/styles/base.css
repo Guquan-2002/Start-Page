@@ -71,20 +71,20 @@ body {
     font-weight: var(--font-weight-regular);
     background: linear-gradient(
         var(--theme-angle),
-        var(--theme-c1) var(--theme-p1, 0%),
-        var(--theme-c2) var(--theme-p2, 33.33%),
-        var(--theme-c3) var(--theme-p3, 66.67%),
-        var(--theme-c4) var(--theme-p4, 100%)
+        var(--theme-color-1) 0%,
+        var(--theme-color-2) 33.33%,
+        var(--theme-color-3) 66.67%,
+        var(--theme-color-4) 100%
     );
     background-size: 400% 400%;
     animation: gradient-flow 24s ease-in-out infinite alternate;
     transition:
         color var(--theme-transition),
         --theme-angle var(--theme-transition),
-        --theme-c1 var(--theme-transition),
-        --theme-c2 var(--theme-transition),
-        --theme-c3 var(--theme-transition),
-        --theme-c4 var(--theme-transition);
+        --theme-color-1 var(--theme-transition),
+        --theme-color-2 var(--theme-transition),
+        --theme-color-3 var(--theme-transition),
+        --theme-color-4 var(--theme-transition);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -144,18 +144,12 @@ body::before {
     }
 }
 
-@media (hover: none) and (pointer: coarse) {
-    * {
-        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
-    }
-
+@media (hover: none) {
     button:active,
     a:active {
         opacity: 0.8;
     }
-}
 
-@media (hover: none) {
     button,
     a,
     input[type="checkbox"] {

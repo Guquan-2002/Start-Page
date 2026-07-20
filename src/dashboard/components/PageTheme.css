@@ -200,8 +200,12 @@
     border-radius: var(--component-radius-pill);
     background: rgba(255, 255, 255, 0.85);
     filter: blur(16px);
-    animation: cloud-drift linear infinite;
+    animation: cloud-drift linear infinite paused;
     will-change: transform;
+}
+
+.day .cloud {
+    animation-play-state: running;
 }
 
 .cloud::before,
@@ -267,8 +271,12 @@
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.28);
     filter: blur(25px);
-    animation: bokeh-float 14s ease-in-out infinite alternate;
+    animation: bokeh-float 14s ease-in-out infinite alternate paused;
     will-change: transform;
+}
+
+.day .bokeh {
+    animation-play-state: running;
 }
 
 .bokeh-1 {

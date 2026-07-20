@@ -36,20 +36,20 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: var(--net-checking);
+    background-color: var(--network-checking-color);
     transition: background-color 0.5s ease;
 }
 
-#network-indicator.global {
-    background-color: var(--net-ok-global);
+#network-indicator.network-indicator--global {
+    background-color: var(--network-global-color);
 }
 
-#network-indicator.cn {
-    background-color: var(--net-ok-cn);
+#network-indicator.network-indicator--domestic {
+    background-color: var(--network-domestic-color);
 }
 
-#network-indicator.net-fail {
-    background-color: var(--net-fail);
+#network-indicator.network-indicator--offline {
+    background-color: var(--network-offline-color);
 }
 
 @media (max-width: 768px) {
