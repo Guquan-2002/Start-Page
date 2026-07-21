@@ -1,0 +1,99 @@
+.weather-cloud {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: var(--weather-cloud-coverage, 0);
+    transition: opacity 2s ease;
+}
+
+.weather-cloud__item {
+    position: absolute;
+    top: var(--weather-cloud-top);
+    left: 0;
+    width: var(--weather-cloud-width);
+    height: var(--weather-cloud-height);
+    border-radius: var(--component-radius-pill);
+    background: linear-gradient(
+        180deg,
+        rgb(255 255 255 / var(--weather-cloud-alpha)),
+        rgb(225 235 244 / var(--weather-cloud-alpha))
+    );
+    box-shadow:
+        0 10px 24px rgb(145 164 181 / 12%),
+        inset 0 8px 16px rgb(255 255 255 / 24%);
+    filter: blur(7px);
+    animation:
+        weather-cloud-drift var(--weather-cloud-duration) linear var(--weather-cloud-delay) infinite,
+        weather-cloud-appear 1.8s ease-out both;
+    animation-fill-mode: backwards, both;
+    will-change: transform;
+}
+
+.weather-cloud__item::before,
+.weather-cloud__item::after {
+    position: absolute;
+    border-radius: 50%;
+    background: inherit;
+    content: '';
+}
+
+.weather-cloud__item::before {
+    top: -82%;
+    left: 16%;
+    width: 43%;
+    height: 172%;
+    box-shadow: 52px 12px 0 -8px rgb(255 255 255 / var(--weather-cloud-alpha));
+    transform: translate(
+        var(--weather-cloud-puff-one-x),
+        var(--weather-cloud-puff-one-y)
+    ) scale(var(--weather-cloud-puff-one-scale));
+}
+
+.weather-cloud__item::after {
+    top: -48%;
+    right: 12%;
+    width: 31%;
+    height: 124%;
+    transform: translate(
+        var(--weather-cloud-puff-two-x),
+        var(--weather-cloud-puff-two-y)
+    ) scale(var(--weather-cloud-puff-two-scale));
+}
+
+@keyframes weather-cloud-drift {
+    from {
+        transform: translateX(calc(-100% - 48px));
+    }
+
+    to {
+        transform: translateX(100vw);
+    }
+}
+
+@keyframes weather-cloud-appear {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .weather-cloud__item {
+        filter: blur(5px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .weather-cloud {
+        transition: none;
+    }
+
+    .weather-cloud__item {
+        animation: none;
+    }
+}

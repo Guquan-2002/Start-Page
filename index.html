@@ -6,18 +6,6 @@
     <title>Start Page</title>
 </head>
 <body>
-    <script>
-        const initialHour = new Date().getHours();
-        const initialTheme = initialHour >= 6 && initialHour < 8
-            ? 'morning'
-            : initialHour >= 8 && initialHour < 16
-                ? 'day'
-                : initialHour >= 16 && initialHour < 18
-                    ? 'evening'
-                    : 'night';
-        document.body.classList.add(initialTheme);
-    </script>
-
     <div id="root"></div>
 
     <script type="module" src="/src/main.jsx"></script>

@@ -4,8 +4,11 @@ import { access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+process.loadEnvFile(path.join(__dirname, '.env'));
+
 import { handleProviderApi } from './src/assistant/server/provider-api.js';
-import { handleSystemStatusApi } from './src/dashboard/server/systemStatusApi.js';
+import { handleDashboardApi } from './src/server/dashboard/dashboard.js';
 
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_PORT = 7121;
@@ -55,7 +58,7 @@ function resolvePath(urlPath) {
 
 const server = createServer(async (request, response) => {
 
-  if (await handleSystemStatusApi(request, response)) {
+  if (await handleDashboardApi(request, response)) {
     return;
   }
 

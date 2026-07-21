@@ -30,6 +30,8 @@
 }
 
 #assistant-panel {
+    --assistant-panel-bg: rgba(20, 20, 30, 0.85);
+
     position: fixed;
     top: 0;
     right: 0;

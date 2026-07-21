@@ -1,0 +1,73 @@
+/* 层叠：0 背景 / 1 星空 / 2 流星 / 3 云层 / 4 面板 / 5 雨雪 */
+
+.glass-surface {
+    background: var(--component-bg);
+    border: 1px solid var(--component-border);
+}
+
+.panels {
+    position: relative;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    gap: clamp(1.25rem, 2vw, 2rem);
+    padding: clamp(12px, 2vw, 20px);
+}
+
+@media (max-width: 768px) {
+    .panels {
+        justify-content: flex-start;
+        padding-top: clamp(12vh, 15vw, 15vh);
+    }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .panels {
+        gap: 0.8rem;
+        padding-top: 8vh;
+    }
+}
+
+.hero {
+    /* Clock card surface tokens (local to hero clock card). */
+    --clock-shadow:
+        0 24px 60px color-mix(
+            in oklab,
+            rgba(4, 8, 20, 0.3),
+            rgba(38, 54, 82, 0.16) calc(var(--daylight) * 100%)
+        ),
+        var(--component-highlight-strong);
+
+    display: grid;
+    justify-items: center;
+    gap: clamp(0.9rem, 1.6vw, 1.25rem);
+    width: min(100%, 44rem);
+    padding: clamp(1.75rem, 3vw, 2.5rem) clamp(1.5rem, 4vw, 3rem);
+    color: var(--text-color);
+    text-align: center;
+    border-radius: var(--component-radius-xl);
+    box-shadow: var(--clock-shadow);
+    backdrop-filter: var(--component-blur-strong);
+    animation: fade-rise var(--entrance-duration) ease-out backwards;
+    transition:
+        color var(--theme-transition),
+        background-color var(--theme-transition),
+        border-color var(--theme-transition),
+        box-shadow var(--theme-transition);
+}
+
+@media (max-width: 768px) {
+    .hero {
+        padding: 1.25rem 1.1rem;
+        border-radius: var(--component-radius-lg);
+    }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .hero {
+        padding-block: 0.9rem;
+    }
+}

@@ -1,0 +1,67 @@
+.shooting-stars {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: var(--night-opacity, 0);
+    transition: opacity var(--sky-transition);
+}
+
+.shooting-stars__item {
+    position: absolute;
+    width: var(--shooting-star-length, 150px);
+    height: 2px;
+    border-radius: var(--component-radius-pill);
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.85));
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
+    animation: shooting-stars-fly var(--shooting-star-duration) ease-in forwards;
+    will-change: opacity, transform;
+}
+
+.shooting-stars__item::after {
+    position: absolute;
+    top: 50%;
+    right: -2px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px 2px rgba(255, 255, 255, 0.9);
+    content: '';
+    transform: translateY(-50%);
+}
+
+@keyframes shooting-stars-fly {
+    0% {
+        opacity: 0;
+        transform: rotate(var(--shooting-star-angle, 135deg)) translateX(0);
+    }
+
+    15%,
+    60% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+        transform:
+            rotate(var(--shooting-star-angle, 135deg))
+            translateX(70vmax);
+    }
+}
+
+@media (max-width: 768px) {
+    .shooting-stars__item {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .shooting-stars {
+        transition: none;
+    }
+
+    .shooting-stars__item {
+        animation: none;
+    }
+}

@@ -1,0 +1,99 @@
+.status-capsule {
+    --network-global-color: #66ccff;
+    --network-domestic-color: #00ee00;
+    --network-offline-color: #ee0000;
+    --network-checking-color: #eeee00;
+
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: min(100%, 24rem);
+    padding: clamp(6px, 0.9vw, 8px) clamp(14px, 1.2vw, 18px);
+    color: var(--text-color-muted);
+    font-size: clamp(0.8rem, 1vw, 0.9rem);
+    font-weight: var(--font-weight-medium);
+    font-variant-numeric: var(--font-variant-numeric);
+    white-space: nowrap;
+    border-radius: var(--component-radius-pill);
+    box-shadow: var(--component-shadow);
+    backdrop-filter: var(--component-blur);
+    animation: fade-rise var(--entrance-duration) ease-out 0.45s backwards;
+    transition:
+        background-color var(--interaction-transition),
+        border-color var(--interaction-transition),
+        box-shadow var(--interaction-transition),
+        transform var(--interaction-transition);
+}
+
+.status-capsule:hover {
+    background: var(--component-bg-hover);
+    border-color: var(--component-border-hover);
+    box-shadow: var(--component-shadow-hover);
+    transform: translateY(-2px);
+}
+
+.status-capsule__dot {
+    flex: 0 0 auto;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: var(--network-checking-color);
+    transition: background-color 0.5s ease;
+}
+
+.status-capsule__dot--checking {
+    background-color: var(--network-checking-color);
+}
+
+.status-capsule__dot--global {
+    background-color: var(--network-global-color);
+}
+
+.status-capsule__dot--domestic {
+    background-color: var(--network-domestic-color);
+}
+
+.status-capsule__dot--offline {
+    background-color: var(--network-offline-color);
+}
+
+.status-capsule__separator {
+    width: 1px;
+    height: 0.9em;
+    background: var(--clock-divider);
+}
+
+.status-capsule__metric {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    flex: 1;
+    align-items: center;
+}
+
+.status-capsule__metric--cpu {
+    flex-grow: 1;
+}
+
+.status-capsule__metric--memory {
+    flex-grow: 2;
+}
+
+.status-capsule__label {
+    justify-self: start;
+}
+
+.status-capsule__value {
+    grid-column: 2;
+    color: var(--text-color);
+    text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-capsule {
+        animation: none;
+    }
+
+    .status-capsule:hover {
+        transform: none;
+    }
+}

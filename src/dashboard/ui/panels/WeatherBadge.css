@@ -1,0 +1,32 @@
+.weather-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    color: var(--text-color-muted);
+    font-size: clamp(1.05rem, 1.3vw, 1.35rem);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+    text-shadow: var(--text-shadow);
+    transition: color var(--interaction-transition);
+}
+
+.weather-badge:visited,
+.weather-badge:active {
+    color: var(--text-color-muted);
+    text-decoration: none;
+}
+
+.weather-badge:hover {
+    color: var(--text-color);
+    text-decoration: none;
+}
+
+.weather-badge__icon {
+    font-size: 1.1em;
+}
+
+@media (max-width: 768px) {
+    .weather-badge {
+        font-size: clamp(0.95rem, 4vw, 1.1rem);
+    }
+}

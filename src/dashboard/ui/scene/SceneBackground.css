@@ -1,0 +1,247 @@
+.scene-background {
+    position: absolute;
+    inset: 0;
+}
+
+.sky-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(
+        160deg,
+        var(--sky-1) 0%,
+        var(--sky-2) 55%,
+        var(--sky-3) 100%
+    );
+    background-size: 200% 200%;
+    animation:
+        sky-day 86400s linear infinite,
+        sky-drift 120s ease-in-out infinite alternate;
+    animation-delay: calc(-1s * var(--seconds-since-midnight, 0)), 0s;
+}
+
+.sky-glow {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+}
+
+.sky-glow__sunrise,
+.sky-glow__sunset,
+.sky-glow__milky-way {
+    position: absolute;
+    transition: opacity var(--sky-transition);
+}
+
+.sky-glow__sunrise {
+    inset: 0;
+    opacity: var(--sunrise-opacity, 0);
+    background: radial-gradient(
+        ellipse 90% 55% at 50% 100%,
+        rgba(255, 170, 90, 0.55) 0%,
+        rgba(255, 200, 140, 0.25) 45%,
+        transparent 75%
+    );
+}
+
+.sky-glow__sunset {
+    inset: 0;
+    opacity: var(--sunset-opacity, 0);
+    background: radial-gradient(
+        ellipse 100% 60% at 50% 100%,
+        rgba(255, 110, 80, 0.5) 0%,
+        rgba(255, 140, 120, 0.2) 50%,
+        transparent 80%
+    );
+}
+
+.sky-glow__milky-way {
+    top: -15%;
+    left: -20%;
+    width: 140%;
+    height: 55%;
+    opacity: var(--night-opacity, 0);
+    background: linear-gradient(
+        115deg,
+        transparent 25%,
+        rgba(160, 190, 255, 0.08) 40%,
+        rgba(255, 255, 255, 0.13) 50%,
+        rgba(160, 190, 255, 0.08) 60%,
+        transparent 75%
+    );
+    filter: blur(30px);
+    transform: rotate(-18deg);
+}
+
+.celestial-bodies {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    overflow: hidden;
+}
+
+.celestial-bodies__sun,
+.celestial-bodies__moon {
+    position: absolute;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition:
+        left var(--sky-transition),
+        top var(--sky-transition),
+        opacity var(--sky-transition);
+    will-change: left, top, opacity;
+}
+
+.celestial-bodies__sun {
+    top: var(--sun-y, 88%);
+    left: var(--sun-x, 4%);
+    width: clamp(64px, 7vw, 96px);
+    opacity: var(--sun-opacity, 0);
+    background: radial-gradient(circle at 40% 38%, #fffbe8, #ffca68 72%);
+    box-shadow:
+        0 0 40px 15px rgba(255, 220, 120, 0.5),
+        0 0 120px 50px rgba(255, 190, 90, 0.22);
+}
+
+.celestial-bodies__moon {
+    top: var(--moon-y, 88%);
+    left: var(--moon-x, 4%);
+    width: clamp(52px, 5.5vw, 76px);
+    opacity: var(--moon-opacity, 0);
+    background: radial-gradient(
+        circle at 35% 35%,
+        #fdfdf6 0%,
+        #e9e7da 55%,
+        #cfcbbb 100%
+    );
+    box-shadow:
+        0 0 24px 6px rgba(255, 250, 220, 0.35),
+        0 0 80px 30px rgba(255, 250, 220, 0.12);
+}
+
+.celestial-bodies__moon::before {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle at 60% 42%,
+            rgba(0, 0, 0, 0.08) 0,
+            rgba(0, 0, 0, 0.08) 5px,
+            transparent 6px
+        ),
+        radial-gradient(
+            circle at 40% 62%,
+            rgba(0, 0, 0, 0.06) 0,
+            rgba(0, 0, 0, 0.06) 7px,
+            transparent 8px
+        ),
+        radial-gradient(
+            circle at 68% 68%,
+            rgba(0, 0, 0, 0.07) 0,
+            rgba(0, 0, 0, 0.07) 4px,
+            transparent 5px
+        );
+    content: '';
+}
+
+@keyframes sky-day {
+    /* 深夜 */
+    0% {
+        --sky-1: #0b1026;
+        --sky-2: #141a3a;
+        --sky-3: #1b2350;
+    }
+
+    /* 黎明前（~5:00） */
+    21% {
+        --sky-1: #1b2350;
+        --sky-2: #2d1b4e;
+        --sky-3: #3a2a6e;
+    }
+
+    /* 日出（~6:30） */
+    27% {
+        --sky-1: #ff9a6b;
+        --sky-2: #ffc98a;
+        --sky-3: #ffe8c2;
+    }
+
+    /* 上午（~8:00） */
+    33% {
+        --sky-1: #8ec9e8;
+        --sky-2: #b8dcec;
+        --sky-3: #e8f2f6;
+    }
+
+    /* 正午（12:00） */
+    50% {
+        --sky-1: #4a9eda;
+        --sky-2: #8ec9e8;
+        --sky-3: #d5ecf5;
+    }
+
+    /* 午后转暖（~16:00） */
+    67% {
+        --sky-1: #5a8fd0;
+        --sky-2: #b0a8d8;
+        --sky-3: #e8cfc0;
+    }
+
+    /* 黄昏（~17:30） */
+    73% {
+        --sky-1: #c2549a;
+        --sky-2: #ff7e5f;
+        --sky-3: #ffb37a;
+    }
+
+    /* 入夜（~19:30） */
+    80% {
+        --sky-1: #3a2a6e;
+        --sky-2: #2d1b4e;
+        --sky-3: #1b2350;
+    }
+
+    100% {
+        --sky-1: #0b1026;
+        --sky-2: #141a3a;
+        --sky-3: #1b2350;
+    }
+}
+
+@keyframes sky-drift {
+    from {
+        background-position: 0% 0%;
+    }
+
+    to {
+        background-position: 100% 100%;
+    }
+}
+
+@media (max-width: 768px) {
+    .celestial-bodies__sun {
+        width: clamp(52px, 14vw, 68px);
+    }
+
+    .celestial-bodies__moon {
+        width: clamp(42px, 11vw, 54px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sky-layer {
+        animation: sky-day 86400s linear infinite;
+        animation-delay: calc(-1s * var(--seconds-since-midnight, 0));
+        animation-play-state: paused;
+    }
+
+    .sky-glow__sunrise,
+    .sky-glow__sunset,
+    .sky-glow__milky-way,
+    .celestial-bodies__sun,
+    .celestial-bodies__moon {
+        transition: none;
+    }
+}

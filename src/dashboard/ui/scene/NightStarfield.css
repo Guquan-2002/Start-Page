@@ -1,0 +1,14 @@
+.night-starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: var(--night-opacity, 0);
+    transition: opacity var(--sky-transition);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .night-starfield {
+        transition: none;
+    }
+}

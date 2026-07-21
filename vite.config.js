@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 import { handleProviderApi } from './src/assistant/server/provider-api.js';
-import { handleSystemStatusApi } from './src/dashboard/server/systemStatusApi.js';
+import { handleDashboardApi } from './src/server/dashboard/dashboard.js';
 
 export default defineConfig({
     base: './',
@@ -11,7 +11,7 @@ export default defineConfig({
         {
             name: 'startpage-api',
             configureServer(server) {
-                server.middlewares.use(handleSystemStatusApi);
+                server.middlewares.use(handleDashboardApi);
                 server.middlewares.use(handleProviderApi);
             }
         }

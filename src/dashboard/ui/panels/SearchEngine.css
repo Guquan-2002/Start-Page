@@ -1,0 +1,89 @@
+.search-engine {
+    width: 100%;
+    max-width: 37.5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    animation: fade-rise var(--entrance-duration) ease-out 0.3s backwards;
+}
+
+.search-engine__button {
+    position: absolute;
+    left: clamp(14px, 1.5vw, 22px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: clamp(32px, 3vw, 40px);
+    aspect-ratio: 1;
+    padding: 0;
+    color: var(--placeholder-color);
+    background: transparent;
+    border: 1px solid var(--component-border);
+    border-radius: 50%;
+    cursor: pointer;
+    transition:
+        color var(--interaction-transition),
+        background-color var(--interaction-transition),
+        border-color var(--interaction-transition),
+        box-shadow var(--interaction-transition);
+}
+
+.search-engine__button:disabled {
+    cursor: default;
+}
+
+.search-engine__icon {
+    font-size: clamp(1rem, 1.2vw, 1.3rem);
+}
+
+.search-engine__input {
+    width: 100%;
+    padding: clamp(14px, 1.5vw, 20px) clamp(16px, 2vw, 24px)
+        clamp(14px, 1.5vw, 20px) clamp(58px, 6vw, 78px);
+    color: var(--text-color);
+    font-size: clamp(1.2rem, 1.2vw, 1.3rem);
+    font-weight: var(--font-weight-regular);
+    border-radius: var(--component-radius-pill);
+    box-shadow: var(--component-shadow);
+    backdrop-filter: var(--component-blur-strong);
+    transition:
+        background-color var(--interaction-transition),
+        border-color var(--interaction-transition),
+        box-shadow var(--interaction-transition);
+}
+
+.search-engine__input::placeholder {
+    color: var(--placeholder-color);
+}
+
+.search-engine__input:hover {
+    background-color: var(--component-bg-hover);
+    border-color: var(--component-border-hover);
+}
+
+.search-engine__input:focus {
+    outline: none;
+    background-color: var(--component-bg-focus);
+    border-color: var(--component-border-focus);
+    box-shadow: var(--component-shadow-focus);
+}
+
+.search-engine__input:focus ~ .search-engine__button,
+.search-engine__button:hover:not(:disabled),
+.search-engine__button:focus-visible {
+    color: var(--text-color);
+    background-color: var(--component-bg-hover);
+    border-color: var(--component-border-hover);
+    box-shadow: var(--component-shadow-hover);
+}
+
+.search-engine__button:focus-visible {
+    outline: none;
+}
+
+@media (max-width: 768px) {
+    .search-engine {
+        max-width: 100%;
+        padding-inline: 10px;
+    }
+}

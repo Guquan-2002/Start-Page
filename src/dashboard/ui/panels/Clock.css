@@ -1,0 +1,70 @@
+.clock {
+    display: grid;
+    width: 100%;
+    justify-items: center;
+    color: var(--text-color);
+    text-align: center;
+}
+
+.clock__time {
+    --time-shadow:
+        0 1px 3px color-mix(
+            in oklab,
+            rgba(0, 0, 0, 0.35),
+            rgba(255, 255, 255, 0.5) calc(var(--daylight) * 100%)
+        ),
+        0 0 24px rgba(255, 255, 255, calc(0.15 + var(--daylight) * 0.2));
+
+    font-size: clamp(6rem, 7vw, 8rem);
+    font-weight: var(--font-weight-semibold);
+    font-variant-numeric: var(--font-variant-numeric);
+    line-height: 1;
+    letter-spacing: 2px;
+    text-shadow: var(--time-shadow);
+    transition: text-shadow var(--theme-transition);
+}
+
+.clock__date {
+    width: 100%;
+    margin-top: clamp(0.65rem, 1.2vw, 0.9rem);
+    padding-top: clamp(0.65rem, 1.2vw, 0.9rem);
+    border-top: 1px solid var(--clock-divider);
+    font-size: clamp(1.4rem, 1.5vw, 1.8rem);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.03em;
+    line-height: 1.35;
+    text-shadow: var(--text-shadow);
+    transition:
+        border-color var(--theme-transition),
+        text-shadow var(--theme-transition);
+}
+
+@media (max-width: 768px) {
+    .clock__time {
+        font-size: clamp(3rem, 14vw, 4.5rem);
+        letter-spacing: 1px;
+    }
+
+    .clock__date {
+        margin-top: 0.55rem;
+        padding-top: 0.55rem;
+        font-size: clamp(0.9rem, 4vw, 1.1rem);
+    }
+}
+
+@media (max-width: 768px) and (orientation: landscape) {
+    .clock__time {
+        font-size: clamp(3rem, 8vw, 3.5rem);
+    }
+
+    .clock__date {
+        font-size: 1rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .clock__time,
+    .clock__date {
+        transition: none;
+    }
+}

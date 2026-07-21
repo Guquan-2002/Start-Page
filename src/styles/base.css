@@ -17,12 +17,6 @@ select {
     font: inherit;
 }
 
-@keyframes gradient-flow {
-    to {
-        background-position: 100% 100%;
-    }
-}
-
 @keyframes fade-in {
     from {
         opacity: 0;
@@ -45,46 +39,18 @@ select {
     }
 }
 
-@keyframes glow-drift {
-    25% {
-        transform: translate(5%, -2%) scale(1);
-    }
-
-    50% {
-        transform: translate(0%, 5%) scale(1.05);
-    }
-
-    75% {
-        transform: translate(-5%, 0%) scale(0.95);
-    }
-
-    100% {
-        transform: translate(5%, 5%) scale(1);
-    }
-}
-
 body {
     min-height: 100dvh;
     overflow: hidden;
     color: var(--text-color);
     font-family: var(--font-family-base);
     font-weight: var(--font-weight-regular);
-    background: linear-gradient(
-        var(--theme-angle),
-        var(--theme-color-1) 0%,
-        var(--theme-color-2) 33.33%,
-        var(--theme-color-3) 66.67%,
-        var(--theme-color-4) 100%
-    );
-    background-size: 400% 400%;
-    animation: gradient-flow 24s ease-in-out infinite alternate;
+    /* 纯色兜底，真正的天空由 Scene 的 .sky-layer 层绘制 */
+    background-color: #0b1026;
+    /* 注册的自定义属性随 JS 写入连续过渡，带动所有 color-mix token 滑动 */
     transition:
         color var(--theme-transition),
-        --theme-angle var(--theme-transition),
-        --theme-color-1 var(--theme-transition),
-        --theme-color-2 var(--theme-transition),
-        --theme-color-3 var(--theme-transition),
-        --theme-color-4 var(--theme-transition);
+        --daylight 120s linear;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
@@ -101,39 +67,10 @@ body {
     border: 0;
 }
 
-body::before {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    content: '';
-    background:
-        radial-gradient(
-            ellipse at 30% 70%,
-            rgba(255, 255, 255, calc(var(--glow-intensity) * 0.5)) 0%,
-            transparent 40%
-        ),
-        radial-gradient(
-            ellipse at 70% 30%,
-            rgba(255, 255, 255, calc(var(--glow-intensity) * 0.3)) 0%,
-            transparent 30%
-        );
-    opacity: 0.8;
-    mix-blend-mode: soft-light;
-    animation: glow-drift 16s linear infinite alternate;
-    will-change: transform;
-}
-
 @media (max-width: 768px) {
     body {
         overflow-x: hidden;
         overflow-y: auto;
-        animation-duration: 32s;
-    }
-
-    body::before {
-        opacity: 0.5;
-        animation: none;
     }
 
     input[type="text"],
@@ -159,20 +96,13 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
     body {
-        animation: none;
         transition: none;
     }
 
-    body::before {
-        animation: none;
-    }
-
-    #time-container,
-    #weather-container,
-    #search-container,
-    #network-status,
-    .weather-config-overlay,
-    .weather-config-dialog {
+    .dashboard__hero,
+    .search-engine,
+    .weather-config,
+    .weather-config__dialog {
         animation: none;
     }
 }

@@ -1,0 +1,10 @@
+.weather-atmosphere {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    filter:
+        brightness(var(--sky-brightness, 1))
+        saturate(var(--sky-saturation, 1));
+    transition: filter 2s ease;
+}
